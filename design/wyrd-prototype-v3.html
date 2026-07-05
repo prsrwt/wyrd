@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wyrd — weave your wyrd</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --parchment:#EDE0C4;
+    --dot:rgba(58,46,28,0.22);
+    --ink:#3A2E1C;
+    --ink-soft:#7A6A4A;
+    --magenta:#C2185B;
+    --gold:#B8912F;
+    --teal:#2C7A72;
+    --drift:#C93B47;
+    --ghost:rgba(194,24,91,0.32);
+    --paper-card:#FFFBEE;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Crimson Pro',Georgia,serif;
+    color:var(--ink);
+    background-color:var(--parchment);
+    background-image:radial-gradient(circle, var(--dot) 1.4px, transparent 1.4px);
+    background-size:22px 22px;
+    overflow-x:hidden;
+  }
+
+  #appViewport{ overflow-x:hidden; width:100%; }
+  #viewsWrap{ display:flex; width:200%; transition:transform .32s cubic-bezier(.4,0,.2,1); }
+  .view{ width:50%; flex:none; min-height:100vh; position:relative; }
+
+  header{ padding:22px 20px 8px; max-width:520px; margin:0 auto; }
+  .eyebrow{ font-family:'Cinzel',serif; font-size:11px; letter-spacing:.32em; color:var(--ink-soft); }
+  h1{ font-family:'Cinzel',serif; font-weight:700; font-size:clamp(24px,6vw,34px); margin:6px 0 2px; letter-spacing:.04em; }
+  .tagline{ font-style:italic; color:var(--ink-soft); font-size:15px; }
+
+  .canvas-wrap{ max-width:520px; margin:0 auto; padding:10px 0 160px; }
+  svg{ display:block; margin:0 auto; }
+  .node{ cursor:pointer; }
+
+  #tooltip{
+    position:fixed; width:220px; padding:10px 12px;
+    background:var(--paper-card); border:1.5px solid var(--magenta); border-radius:3px;
+    box-shadow:0 3px 10px rgba(58,46,28,.25);
+    font-size:14px; line-height:1.35; pointer-events:none; z-index:60; display:none;
+  }
+  #tooltip .tt-meta{ font-family:'Cinzel',serif; font-size:10px; letter-spacing:.12em; color:var(--ink-soft); margin-bottom:3px; }
+
+  .legend{ max-width:520px; margin:0 auto; padding:0 20px 18px; display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px; color:var(--ink-soft); }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+
+  footer{ text-align:center; font-size:13px; font-style:italic; color:var(--ink-soft); padding:0 20px 30px; }
+
+  /* —— edge tabs (swipe fallback) —— */
+  .edge-tab{
+    position:fixed; top:50%; transform:translateY(-50%);
+    background:var(--ink); color:var(--parchment);
+    padding:14px 7px; font-family:'Cinzel',serif; font-size:11px; letter-spacing:.1em;
+    cursor:pointer; z-index:90; writing-mode:vertical-rl; text-orientation:mixed;
+  }
+  .right-tab{ right:0; border-radius:8px 0 0 8px; }
+  .left-tab{ left:0; border-radius:0 8px 8px 0; transform:translateY(-50%) rotate(180deg); }
+
+  /* —— heatmap —— */
+  .heatmap-body{ max-width:520px; margin:0 auto; padding:6px 20px 80px; }
+  .month-block{ margin-bottom:26px; }
+  .month-heading{ font-family:'Cinzel',serif; font-size:14px; letter-spacing:.1em; color:var(--ink-soft); margin-bottom:8px; }
+  .weekday-row{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:5px; }
+  .weekday-row span{ font-size:10px; text-align:center; color:var(--ink-soft); }
+  .month-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .day-cell{ position:relative; aspect-ratio:1; border-radius:6px; background:rgba(255,255,255,0.3); }
+  .day-num{ position:absolute; top:2px; left:4px; font-size:8.5px; color:var(--ink-soft); }
+  .side-dot{ position:absolute; bottom:3px; right:3px; width:6px; height:6px; border-radius:50%; background:var(--teal); }
+  .heatmap-caption{ font-size:12.5px; font-style:italic; color:var(--ink-soft); margin:4px 0 16px; }
+
+  /* —— floating AI banner —— */
+  .banner{
+    position:fixed; top:14px; left:50%; transform:translate(-50%,-140%);
+    width:min(90vw,360px); padding:14px 16px; border-radius:8px;
+    border:1.5px solid var(--drift); background:var(--paper-card);
+    box-shadow:0 6px 18px rgba(58,46,28,.28);
+    z-index:70; transition:transform .3s ease;
+  }
+  .banner.show{ transform:translate(-50%,0); }
+  .banner .b-label{ font-family:'Cinzel',serif; font-size:11px; letter-spacing:.16em; color:var(--drift); display:block; margin-bottom:6px; }
+  .banner .b-text{ font-size:14.5px; line-height:1.4; margin-bottom:10px; }
+  .banner .b-actions{ display:flex; gap:8px; }
+  .btn{ font-family:'Crimson Pro',serif; font-size:14px; padding:7px 13px; border-radius:5px; border:1.5px solid var(--ink); background:transparent; color:var(--ink); cursor:pointer; }
+  .btn:hover{ background:var(--ink); color:var(--parchment); }
+  .btn.primary{ border-color:var(--gold); background:rgba(184,145,47,0.18); }
+  .btn.primary:hover{ background:var(--gold); color:#2A2010; }
+  .btn.ghost{ border-color:var(--ink-soft); color:var(--ink-soft); flex:none; }
+  .btn.small{ font-size:12.5px; padding:5px 10px; }
+
+  /* —— floating commit FAB —— */
+  .fab{
+    position:fixed; right:20px; bottom:20px; z-index:80;
+    width:64px; height:64px; border-radius:32px;
+    background:var(--magenta); color:#FFF3EA;
+    box-shadow:0 6px 16px rgba(58,46,28,.35);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; overflow:hidden;
+    transition:width .28s cubic-bezier(.4,0,.2,1), height .28s cubic-bezier(.4,0,.2,1), border-radius .28s ease;
+  }
+  .fab .fab-collapsed{ font-family:'Cinzel',serif; font-size:13px; text-align:center; line-height:1.15; white-space:nowrap; }
+  .fab.expanded{
+    width:min(88vw,320px); height:auto; max-height:76vh; border-radius:14px;
+    background:var(--paper-card); color:var(--ink);
+    align-items:stretch; justify-content:flex-start; cursor:default;
+    overflow-y:auto;
+  }
+  .fab.expanded .fab-collapsed{ display:none; }
+  .fab-expanded{ display:none; width:100%; padding:16px; }
+  .fab.expanded .fab-expanded{ display:block; }
+
+  .fx-title{ font-family:'Cinzel',serif; font-size:12px; letter-spacing:.16em; color:var(--ink-soft); display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .fx-close{ cursor:pointer; font-size:18px; line-height:1; color:var(--ink-soft); }
+  .tasks{ display:flex; flex-direction:column; gap:9px; margin-bottom:12px; }
+  .task{ display:flex; align-items:center; gap:9px; font-size:15px; }
+  .task input[type=checkbox]{ width:18px; height:18px; accent-color:var(--magenta); flex:none; }
+  textarea{
+    width:100%; min-height:56px; resize:vertical; font-family:'Crimson Pro',serif; font-size:14.5px;
+    padding:8px 10px; border:1.5px solid var(--parchment); border-radius:6px; background:#FFFEF8; color:var(--ink);
+  }
+  textarea:focus{ outline:2px solid var(--magenta); outline-offset:1px; }
+  .sheet-footer{ display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:10px; }
+  .count-hint{ font-size:12px; color:var(--ink-soft); }
+  .divider{ border:none; border-top:1px dashed var(--parchment); margin:14px 0; }
+  .branch-title{ font-family:'Cinzel',serif; font-size:11px; letter-spacing:.14em; color:var(--teal); margin-bottom:8px; }
+  .task input[type=checkbox]#branchCheck{ accent-color:var(--teal); }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+
+<div id="appViewport">
+  <div id="viewsWrap">
+
+    <!-- —— VIEW 1: THE GRAPH —— -->
+    <div class="view" id="viewGraph">
+      <header>
+        <div class="eyebrow">PROTOTYPE · SWIPE FOR HEATMAP</div>
+        <h1>⚔ Wyrd</h1>
+        <div class="tagline">weave your wyrd</div>
+      </header>
+
+      <div class="canvas-wrap" id="canvasWrap">
+        <svg id="graph"></svg>
+      </div>
+
+      <div class="legend">
+        <span><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#C2185B" stroke-width="3"/></svg>main</span>
+        <span><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#2C7A72" stroke-width="3"/></svg>branch</span>
+        <span><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#B8912F" stroke-width="3"/></svg>merge</span>
+        <span><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#C93B47" stroke-width="3"/></svg>drift</span>
+        <span><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="rgba(194,24,91,0.32)" stroke-width="3" stroke-dasharray="5 4"/></svg>ghost</span>
+      </div>
+
+      <footer>stay true to yourself · stay true to keep an accurate history</footer>
+      <div class="edge-tab right-tab" id="toHeatmapTab">HEATMAP ›</div>
+    </div>
+
+    <!-- —— VIEW 2: MONTHLY HEATMAP —— -->
+    <div class="view" id="viewHeatmap">
+      <div class="edge-tab left-tab" id="toGraphTab">‹ GRAPH</div>
+      <header>
+        <div class="eyebrow">SWIPE RIGHT TO RETURN</div>
+        <h1 style="font-size:26px;">Monthly Heatmap</h1>
+        <div class="tagline">the same history, zoomed out</div>
+      </header>
+      <div class="heatmap-body" id="heatmapBody"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<div class="banner" id="banner">
+  <span class="b-label">A RIVAL BANNER RISES</span>
+  <div class="b-text" id="bannerText"></div>
+  <div class="b-actions">
+    <button class="btn primary" id="btnName">Name it as a branch</button>
+    <button class="btn ghost" id="btnDismiss">Not now</button>
+  </div>
+</div>
+
+<div class="fab" id="fab">
+  <div class="fab-collapsed" id="fabCollapsed">＋<br>commit</div>
+  <div class="fab-expanded">
+    <div class="fx-title">TODAY <span class="fx-close" id="fxClose">✕</span></div>
+    <div class="tasks" id="tasks">
+      <label class="task"><input type="checkbox" data-task="study" checked> Study block</label>
+      <label class="task"><input type="checkbox" data-task="exercise" checked> Exercise</label>
+      <label class="task"><input type="checkbox" data-task="reading"> Reading</label>
+      <label class="task"><input type="checkbox" data-task="practice" checked> Practice</label>
+      <label class="task"><input type="checkbox" data-task="wind_down" checked> Wind-down</label>
+    </div>
+    <textarea id="msgInput" placeholder="feat: what actually happened today..."></textarea>
+    <div class="sheet-footer">
+      <span class="count-hint" id="countHint">4/5 checked</span>
+      <button class="btn primary" id="commitBtn">Commit</button>
+    </div>
+
+    <hr class="divider">
+    <button class="btn small" id="startBranchBtn">+ Start a side branch</button>
+
+    <div id="branchSection" style="display:none;">
+      <div class="branch-title" id="branchName">SIDE BRANCH</div>
+      <label class="task"><input type="checkbox" id="branchCheck"> Worked on it today</label>
+      <textarea id="branchMsgInput" placeholder="feat: branch progress..." style="margin-top:8px;"></textarea>
+      <button class="btn small" id="mergeBranchBtn" style="margin-top:10px;">Merge branch ✦</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const C = {
+  ink:"#3A2E1C", inkSoft:"#7A6A4A",
+  magenta:"#C2185B", gold:"#B8912F", teal:"#2C7A72", drift:"#C93B47",
+  ghost:"rgba(194,24,91,0.32)"
+};
+const DAY_H = 52, Y0 = 60;
+const LANE = { drift: 64, main: 168, cert: 272 };
+const dy = d => Y0 + d * DAY_H;
+const START_DATE = new Date(2026, 5, 1); // June 1, 2026 — day 34 lands on "today"
+
+function el(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function vbez(x1,y1,x2,y2){ const my=(y1+y2)/2; return `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`; }
+function hexToRgba(hex, alpha){
+  const h = hex.replace('#','');
+  const r=parseInt(h.substring(0,2),16), g=parseInt(h.substring(2,4),16), b=parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// —— seed history (days 0–33) ——
+const mainCommits = [
+  {d:0,done:5,total:5,msg:"feat: trajectory forged"},
+  {d:1,done:5,total:5,msg:"feat: study block + run"},
+  {d:2,done:4,total:5,msg:"feat: good focus today"},
+  {d:3,done:3,total:5,msg:"fix: slept late, still moved"},
+  {d:4,done:5,total:5,msg:"feat: it finally clicked"},
+  {d:5,done:5,total:5,msg:"feat: steady day"},
+  {d:6,done:5,total:5,msg:"feat: enrolled in a course — branched"},
+  {d:7,done:4,total:5,msg:"feat: on track"},
+  {d:8,done:5,total:5,msg:"feat: solid 5/5"},
+  {d:9,done:2,total:5,msg:"fix: headache, low output"},
+  {d:10,done:5,total:5,msg:"feat: back on 5/5"},
+  {d:11,done:4,total:5,msg:"feat: steady"},
+  {d:12,done:5,total:5,msg:"feat: good rhythm"},
+  {d:13,done:5,total:5,msg:"feat: strong week closing"},
+  {d:14,done:4,total:5,msg:"merge: course complete ✦",merge:true},
+  {d:15,done:3,total:5,msg:"fix: late night, distracted"},
+  {d:16,done:2,total:5,msg:"fix: distracted again"},
+  {d:17,done:2,total:5,msg:"chore: bare minimum"},
+  {d:18,done:1,total:5,msg:"fix: barely showed up"},
+];
+const certCommits = [
+  {d:7,done:3,total:3,msg:"feat: course — module 1"},
+  {d:9,done:2,total:3,msg:"feat: deep dive"},
+  {d:11,done:3,total:3,msg:"feat: hands-on module"},
+  {d:13,done:3,total:3,msg:"feat: passed practice exam"},
+];
+const driftCommits = [
+  {d:19,done:2,total:5,msg:"fix: whole evening lost to it"},
+  {d:20,done:1,total:5,msg:"fix: same again"},
+  {d:21,done:2,total:5,msg:"chore: one small thing done"},
+  {d:22,done:1,total:5,msg:"fix: late again"},
+  {d:23,done:2,total:5,msg:"docs: reading old commits. this graph hurts"},
+  {d:24,done:2,total:5,msg:"fix: trying to stop"},
+  {d:25,done:3,total:5,msg:"feat: small win this morning"},
+];
+const recoveredCommits = [
+  {d:26,done:4,total:5,msg:"merge: counter-merge. back on trajectory",counter:true},
+  {d:27,done:5,total:5,msg:"feat: steady again"},
+  {d:28,done:5,total:5,msg:"feat: closing the ghost gap"},
+  {d:29,done:3,total:5,msg:"fix: tired but showed up"},
+  {d:30,done:5,total:5,msg:"feat: good day"},
+  {d:31,done:5,total:5,msg:"feat: strong"},
+  {d:32,done:4,total:5,msg:"feat: mock review with a colleague"},
+  {d:33,done:5,total:5,msg:"feat: still here",tip:true},
+];
+const ghostDays = [19,20,21,22,23,24,25];
+
+let nextDay = 34;
+let liveCommits = [];
+let liveSideCommits = [];   // {d, done, total, msg, fromDay, firstOfBranch}
+let liveMerges = [];        // {d, fromDay, name}
+let liveDriftBranches = [];
+let activeBranch = null;    // {name, startDay, lastDay}
+let driftStreak = 0, dismissedOnce = false, lastKeyword = "";
+const DRIFT_KEYWORDS = ["game","gaming","valorant","netflix","doomscroll","scrolling","ranked"];
+
+const svg = document.getElementById('graph');
+const tooltip = document.getElementById('tooltip');
+
+function setSvgSize(){
+  const h = dy(nextDay) + 40;
+  svg.setAttribute('width', 340);
+  svg.setAttribute('height', h);
+  svg.setAttribute('viewBox', `0 0 340 ${h}`);
+}
+function showTip(evt, meta, text, ghost){
+  tooltip.style.display = 'block';
+  tooltip.style.left = Math.min(evt.clientX + 14, window.innerWidth - 236) + 'px';
+  tooltip.style.top = (evt.clientY + 14) + 'px';
+  tooltip.style.borderColor = ghost ? C.inkSoft : C.magenta;
+  tooltip.innerHTML = `<div class="tt-meta">${meta}</div><div style="${ghost?'font-style:italic;color:'+C.inkSoft:''}">${text}</div>`;
+}
+function hideTip(){ tooltip.style.display = 'none'; }
+
+function drawNode(c, lane, color){
+  const x = LANE[lane], y = dy(c.d);
+  const ratio = c.total ? c.done/c.total : 0;
+  const g = el('g', {class:'node'}, svg);
+  const meta = `DAY ${c.d+1}${c.total? ' · '+c.done+'/'+c.total+' TASKS':''}`;
+  g.addEventListener('mouseenter', e => showTip(e, meta, c.msg));
+  g.addEventListener('mousemove', e => { tooltip.style.left=Math.min(e.clientX+14, window.innerWidth-236)+'px'; tooltip.style.top=(e.clientY+14)+'px'; });
+  g.addEventListener('mouseleave', hideTip);
+  g.addEventListener('click', e => showTip(e, meta, c.msg));
+
+  if(c.tip){
+    const pulse = el('circle', {cx:x, cy:y, r:15, fill:color, 'fill-opacity':0.18}, g);
+    el('animate', {attributeName:'r', values:'12;17;12', dur:'2.6s', repeatCount:'indefinite'}, pulse);
+  }
+  if(c.merge || c.counter){
+    el('rect', { x:x-6, y:y-6, width:12, height:12, fill: c.counter?C.magenta:C.gold, stroke:C.ink, 'stroke-width':1, transform:`rotate(45 ${x} ${y})` }, g);
+  } else {
+    el('circle', { cx:x, cy:y, r:6.5, fill:color, 'fill-opacity':0.2+0.8*ratio, stroke:color, 'stroke-width':1.8 }, g);
+  }
+  if(c.total){
+    const t = el('text', {x:x+14, y:y+4, 'font-size':10.5, 'font-family':"'Crimson Pro',serif", 'font-weight':600, fill: ratio>=0.8?C.ink:C.inkSoft}, g);
+    t.textContent = `${c.done}/${c.total}`;
+  }
+}
+function drawGhostNode(d){
+  const x = LANE.main, y = dy(d);
+  const g = el('g', {class:'node'}, svg);
+  g.addEventListener('mouseenter', e => showTip(e, `DAY ${d+1} · GHOST`, "the you that kept going", true));
+  g.addEventListener('mousemove', e => { tooltip.style.left=Math.min(e.clientX+14, window.innerWidth-236)+'px'; tooltip.style.top=(e.clientY+14)+'px'; });
+  g.addEventListener('mouseleave', hideTip);
+  el('circle', {cx:x, cy:y, r:5.5, fill:'none', stroke:C.ghost, 'stroke-width':1.8, 'stroke-dasharray':'3 3'}, g);
+}
+
+function renderStatic(){
+  svg.innerHTML = '';
+  setSvgSize();
+  const mx = LANE.main;
+
+  el('line', {x1:mx-26, y1:dy(0)-16, x2:mx+26, y2:dy(0)-16, stroke:C.gold, 'stroke-width':3}, svg);
+  el('circle', {cx:mx, cy:dy(0)-30, r:4, fill:'none', stroke:C.gold, 'stroke-width':2.5}, svg);
+
+  el('line', {x1:mx,y1:dy(0),x2:mx,y2:dy(14), stroke:C.magenta,'stroke-width':3}, svg);
+  el('line', {x1:mx,y1:dy(14),x2:mx,y2:dy(18), stroke:C.magenta,'stroke-width':4}, svg);
+
+  el('path', {d:vbez(mx,dy(6),LANE.cert,dy(7)), fill:'none', stroke:C.teal,'stroke-width':2.5}, svg);
+  el('line', {x1:LANE.cert,y1:dy(7),x2:LANE.cert,y2:dy(13), stroke:C.teal,'stroke-width':2.5}, svg);
+  el('path', {d:vbez(LANE.cert,dy(13),mx,dy(14)), fill:'none', stroke:C.gold,'stroke-width':2.5}, svg);
+
+  el('path', {d:vbez(mx,dy(14),LANE.drift,dy(15)), fill:'none', stroke:C.drift,'stroke-width':2,'stroke-dasharray':'5 4', opacity:.8}, svg);
+  el('line', {x1:LANE.drift,y1:dy(15),x2:LANE.drift,y2:dy(18), stroke:C.drift,'stroke-width':2,'stroke-dasharray':'5 4', opacity:.8}, svg);
+  el('path', {d:vbez(mx,dy(18),LANE.drift,dy(19)), fill:'none', stroke:C.drift,'stroke-width':3.5}, svg);
+  el('line', {x1:LANE.drift,y1:dy(19),x2:LANE.drift,y2:dy(25), stroke:C.drift,'stroke-width':3.5}, svg);
+
+  el('line', {x1:mx,y1:dy(18),x2:mx,y2:dy(26), stroke:C.ghost,'stroke-width':2.5,'stroke-dasharray':'7 6'}, svg);
+
+  el('path', {d:vbez(LANE.drift,dy(25),mx,dy(26)), fill:'none', stroke:C.magenta,'stroke-width':3}, svg);
+  el('line', {x1:mx,y1:dy(26),x2:mx,y2:dy(33), stroke:C.magenta,'stroke-width':4}, svg);
+
+  if(nextDay > 34){
+    el('line', {x1:mx,y1:dy(33),x2:mx,y2:dy(nextDay-1), stroke:C.magenta,'stroke-width':4}, svg);
+  }
+
+  mainCommits.forEach(c=>drawNode(c,'main',C.magenta));
+  certCommits.forEach(c=>drawNode(c,'cert',C.teal));
+  driftCommits.forEach(c=>drawNode(c,'drift',C.drift));
+  ghostDays.forEach(drawGhostNode);
+  recoveredCommits.forEach(c=>drawNode(c,'main',C.magenta));
+  liveCommits.forEach(c=>drawNode(c,'main',C.magenta));
+
+  liveSideCommits.forEach((s,i)=>{
+    if(s.firstOfBranch){
+      el('path', {d:vbez(mx,dy(s.fromDay),LANE.cert,dy(s.d)), fill:'none', stroke:C.teal,'stroke-width':2.5}, svg);
+    } else {
+      const prev = liveSideCommits[i-1];
+      el('line', {x1:LANE.cert,y1:dy(prev.d),x2:LANE.cert,y2:dy(s.d), stroke:C.teal,'stroke-width':2.5}, svg);
+    }
+    drawNode(s,'cert',C.teal);
+  });
+
+  liveMerges.forEach(m=>{
+    el('path', {d:vbez(LANE.cert,dy(m.fromDay), mx, dy(m.d)), fill:'none', stroke:C.gold,'stroke-width':2.5}, svg);
+    drawNode({d:m.d, total:0, done:0, msg:`merge: ${m.name} ✦`, merge:true}, 'main', C.gold);
+  });
+
+  liveDriftBranches.forEach(b=>{
+    el('path', {d:vbez(mx,dy(b.fromDay),LANE.drift,dy(b.d)), fill:'none', stroke: b.forced?C.drift:C.gold, 'stroke-width':2.5, 'stroke-dasharray': b.forced?'5 4':'0'}, svg);
+    drawNode({d:b.d,done:0,total:0,msg:b.forced ? `⚠ forced branch — "${b.name}"` : `feat: named it — "${b.name}"`}, 'drift', b.forced?C.drift:C.gold);
+  });
+}
+renderStatic();
+
+// —— floating commit FAB ——
+const fab = document.getElementById('fab');
+const fabCollapsed = document.getElementById('fabCollapsed');
+const tasksWrap = document.getElementById('tasks');
+const msgInput = document.getElementById('msgInput');
+const countHint = document.getElementById('countHint');
+
+function updateHint(){
+  const boxes = [...tasksWrap.querySelectorAll('input[type=checkbox]')];
+  const n = boxes.filter(b=>b.checked).length;
+  countHint.textContent = `${n}/${boxes.length} checked`;
+}
+tasksWrap.addEventListener('change', updateHint);
+updateHint();
+
+fabCollapsed.addEventListener('click', ()=> fab.classList.add('expanded'));
+document.getElementById('fxClose').addEventListener('click', ()=> fab.classList.remove('expanded'));
+
+function refreshBranchUI(){
+  const startBtn = document.getElementById('startBranchBtn');
+  const section = document.getElementById('branchSection');
+  if(activeBranch){
+    startBtn.style.display = 'none';
+    section.style.display = 'block';
+    document.getElementById('branchName').textContent = activeBranch.name.toUpperCase();
+  } else {
+    startBtn.style.display = 'inline-block';
+    section.style.display = 'none';
+  }
+}
+document.getElementById('startBranchBtn').addEventListener('click', ()=>{
+  const name = window.prompt("Name your new side branch:", "Side quest");
+  if(!name) return;
+  activeBranch = { name, startDay: nextDay, lastDay: null };
+  refreshBranchUI();
+});
+document.getElementById('mergeBranchBtn').addEventListener('click', ()=>{
+  if(!activeBranch || activeBranch.lastDay === null){
+    alert("Commit to the branch at least once before merging.");
+    return;
+  }
+  liveMerges.push({ fromDay: activeBranch.lastDay, d: nextDay, name: activeBranch.name });
+  nextDay += 1;
+  activeBranch = null;
+  refreshBranchUI();
+  renderStatic();
+  window.scrollTo({ top: document.body.scrollHeight, behavior:'smooth' });
+});
+refreshBranchUI();
+
+document.getElementById('commitBtn').addEventListener('click', ()=>{
+  const boxes = [...tasksWrap.querySelectorAll('input[type=checkbox]')];
+  const done = boxes.filter(b=>b.checked).length;
+  const total = boxes.length;
+  const msg = msgInput.value.trim() || "(no message)";
+  const d = nextDay;
+
+  recoveredCommits.forEach(c=>delete c.tip);
+  liveCommits.forEach(c=>delete c.tip);
+  liveCommits.push({d, done, total, msg, tip:true});
+
+  // —— second commit, same day, if a side branch is active ——
+  if(activeBranch){
+    const bChecked = document.getElementById('branchCheck').checked;
+    const bMsg = document.getElementById('branchMsgInput').value.trim();
+    if(bChecked || bMsg){
+      liveSideCommits.push({
+        d, done: bChecked?1:0, total:1,
+        msg: bMsg || (bChecked ? "feat: branch work done" : "(no message)"),
+        fromDay: activeBranch.startDay,
+        firstOfBranch: activeBranch.lastDay === null
+      });
+      activeBranch.lastDay = d;
+    }
+    document.getElementById('branchCheck').checked = false;
+    document.getElementById('branchMsgInput').value = '';
+  }
+
+  nextDay += 1;
+  renderStatic();
+  fabCollapsed.innerHTML = `${done}/${total}<br>today`;
+  fab.classList.remove('expanded');
+  window.scrollTo({ top: document.body.scrollHeight, behavior:'smooth' });
+
+  const lower = msg.toLowerCase();
+  const hit = DRIFT_KEYWORDS.find(k => lower.includes(k));
+  if(hit){ driftStreak += 1; lastKeyword = hit; } else { driftStreak = 0; dismissedOnce = false; }
+  if(driftStreak === 2 && !dismissedOnce) showBanner(1);
+  else if(driftStreak >= 3 && dismissedOnce) showBanner(2);
+
+  msgInput.value = '';
+  updateHint();
+});
+
+// —— floating AI banner ——
+const banner = document.getElementById('banner');
+const bannerText = document.getElementById('bannerText');
+const btnName = document.getElementById('btnName');
+const btnDismiss = document.getElementById('btnDismiss');
+let bannerPrompt = 0;
+
+function showBanner(promptNum){
+  bannerPrompt = promptNum;
+  banner.classList.add('show');
+  if(promptNum === 1){
+    bannerText.textContent = `"${lastKeyword}" has appeared in ${driftStreak} commits and your completion is falling. Name it as a branch?`;
+    btnDismiss.textContent = "Not now";
+  } else {
+    bannerText.textContent = `This is the second time — name it now, or Wyrd will branch it for you.`;
+    btnDismiss.textContent = "Still not now";
+  }
+}
+function resolveBanner(){ banner.classList.remove('show'); driftStreak = 0; dismissedOnce = false; }
+btnDismiss.addEventListener('click', ()=>{
+  if(bannerPrompt === 1){ dismissedOnce = true; resolveBanner(); }
+  else {
+    liveDriftBranches.push({ fromDay: nextDay-1, d: nextDay, name: lastKeyword, forced:true });
+    resolveBanner(); renderStatic();
+  }
+});
+btnName.addEventListener('click', ()=>{
+  const name = window.prompt("Name this branch:", lastKeyword) || lastKeyword;
+  liveDriftBranches.push({ fromDay: nextDay-1, d: nextDay, name, forced:false });
+  resolveBanner(); renderStatic();
+});
+
+// —— monthly heatmap ——
+function buildDayMap(){
+  const map = {};
+  ghostDays.forEach(d => map[d] = {...(map[d]||{}), ghost:true});
+  certCommits.forEach(c => { if(!map[c.d] || !map[c.d].type) map[c.d] = {...(map[c.d]||{}), type:'cert', ratio:c.done/c.total}; });
+  liveSideCommits.forEach(c => {
+    map[c.d] = {...(map[c.d]||{}), side:true};
+    if(!map[c.d].type){ map[c.d].type='cert'; map[c.d].ratio=c.done/c.total; }
+  });
+  driftCommits.forEach(c => map[c.d] = {...(map[c.d]||{}), type:'drift', ratio:c.done/c.total});
+  liveDriftBranches.forEach(b => map[b.d] = {...(map[b.d]||{}), type:'drift', ratio:1});
+  const mainAll = [...mainCommits, ...recoveredCommits, ...liveCommits];
+  mainAll.forEach(c => map[c.d] = {...(map[c.d]||{}), type:'main', ratio:c.done/c.total, merge:!!c.merge, counter:!!c.counter});
+  liveMerges.forEach(m => map[m.d] = {...(map[m.d]||{}), type:'main', ratio:1, merge:true});
+  return map;
+}
+function monthLabel(year,month){ return new Date(year,month,1).toLocaleString('en-US',{month:'long',year:'numeric'}); }
+
+function buildHeatmap(){
+  const container = document.getElementById('heatmapBody');
+  container.innerHTML = '';
+  const dayMap = buildDayMap();
+  const totalDays = nextDay;
+  const lastDate = new Date(START_DATE); lastDate.setDate(START_DATE.getDate() + totalDays - 1);
+  let cursor = new Date(START_DATE.getFullYear(), START_DATE.getMonth(), 1);
+  const endMonth = new Date(lastDate.getFullYear(), lastDate.getMonth(), 1);
+
+  while(cursor <= endMonth){
+    const year = cursor.getFullYear(), month = cursor.getMonth();
+    const block = document.createElement('div'); block.className = 'month-block';
+    const heading = document.createElement('div'); heading.className = 'month-heading';
+    heading.textContent = monthLabel(year, month);
+    block.appendChild(heading);
+
+    const wdRow = document.createElement('div'); wdRow.className = 'weekday-row';
+    ['S','M','T','W','T','F','S'].forEach(w => { const s = document.createElement('span'); s.textContent = w; wdRow.appendChild(s); });
+    block.appendChild(wdRow);
+
+    const grid = document.createElement('div'); grid.className = 'month-grid';
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    for(let i=0; i<firstWeekday; i++){ grid.appendChild(document.createElement('div')); }
+    for(let dom=1; dom<=daysInMonth; dom++){
+      const dateObj = new Date(year, month, dom);
+      const dIdx = Math.round((dateObj - START_DATE) / 86400000);
+      const cell = document.createElement('div');
+      cell.className = 'day-cell';
+      if(dIdx >= 0 && dIdx < totalDays){
+        const info = dayMap[dIdx];
+        if(info && info.type){
+          const ratio = info.ratio != null ? info.ratio : 1;
+          const base = info.type === 'main' ? C.magenta : info.type === 'drift' ? C.drift : C.teal;
+          cell.style.background = hexToRgba(base, 0.22 + 0.7*ratio);
+          if(info.merge || info.counter){ cell.style.boxShadow = `0 0 0 2px ${C.gold} inset`; }
+        }
+        if(info && info.ghost){ cell.style.outline = `1.5px dashed ${C.ghost}`; cell.style.outlineOffset = '-1.5px'; }
+        if(info && info.side){ const dot = document.createElement('span'); dot.className = 'side-dot'; cell.appendChild(dot); }
+        cell.title = `Day ${dIdx+1}`;
+      }
+      const num = document.createElement('span'); num.className = 'day-num'; num.textContent = dom;
+      cell.appendChild(num);
+      grid.appendChild(cell);
+    }
+    block.appendChild(grid);
+    container.appendChild(block);
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  const cap = document.createElement('div');
+  cap.className = 'heatmap-caption';
+  cap.textContent = 'colored = commit that day · dashed outline = ghost day · dot = more than one branch committed';
+  container.appendChild(cap);
+}
+
+// —— swipe / tab navigation between the two views ——
+const viewsWrap = document.getElementById('viewsWrap');
+const appViewport = document.getElementById('appViewport');
+let showingHeatmap = false;
+function goHeatmap(){ buildHeatmap(); viewsWrap.style.transform = 'translateX(-50%)'; showingHeatmap = true; }
+function goGraph(){ viewsWrap.style.transform = 'translateX(0)'; showingHeatmap = false; }
+document.getElementById('toHeatmapTab').addEventListener('click', goHeatmap);
+document.getElementById('toGraphTab').addEventListener('click', goGraph);
+
+let touchStartX = 0, touchStartY = 0;
+appViewport.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
+}, {passive:true});
+appViewport.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy2 = e.changedTouches[0].clientY - touchStartY;
+  if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy2)){
+    if(dx < 0 && !showingHeatmap) goHeatmap();
+    else if(dx > 0 && showingHeatmap) goGraph();
+  }
+});
+</script>
+</body>
+</html>
