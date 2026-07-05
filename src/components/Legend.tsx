@@ -21,7 +21,7 @@ const ITEMS: Item[] = [
 
 export default function Legend() {
   return (
-    <div className="mx-auto flex max-w-[520px] flex-wrap gap-[14px] px-5 pb-[18px] text-[12.5px] text-[var(--ink-soft)]">
+    <div className="mx-auto flex max-w-[520px] flex-wrap justify-center gap-[14px] px-5 pb-[18px] text-[12.5px] text-[var(--ink-soft)]">
       {ITEMS.map((item) => (
         <span key={item.label} className="inline-flex items-center gap-[6px]">
           <svg width="18" height="8" aria-hidden>

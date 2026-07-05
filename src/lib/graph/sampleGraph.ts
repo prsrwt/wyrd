@@ -72,6 +72,8 @@ const certNodes: GraphNode[] = [
 ];
 
 const driftNodes: GraphNode[] = [
+  // branch-origin dot — the drift begins here (no tasks yet, so a plain dot)
+  { day: 15, lane: "drift", kind: "commit", msg: "drift begins — Wyrd starts watching", color: drift },
   { day: 19, lane: "drift", kind: "commit", done: 2, total: 5, msg: "fix: whole evening lost to it", color: drift },
   { day: 20, lane: "drift", kind: "commit", done: 1, total: 5, msg: "fix: same again", color: drift },
   { day: 21, lane: "drift", kind: "commit", done: 2, total: 5, msg: "chore: one small thing done", color: drift },

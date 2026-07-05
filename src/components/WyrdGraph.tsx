@@ -150,7 +150,9 @@ interface NodeMarkProps {
 function NodeMark({ node, onEnter, onMove, onLeave }: NodeMarkProps) {
   const x = laneX(node.lane);
   const y = dayY(node.day);
-  const ratio = node.total ? (node.done ?? 0) / node.total : 0;
+  // A node with no task total is a branch-origin marker — a plain solid dot.
+  const hasTasks = node.total != null;
+  const ratio = hasTasks ? (node.done ?? 0) / (node.total ?? 1) : 0;
 
   return (
     <g
@@ -198,7 +200,7 @@ function NodeMark({ node, onEnter, onMove, onLeave }: NodeMarkProps) {
           cy={y}
           r={GEOMETRY.nodeRadius}
           fill={node.color}
-          fillOpacity={0.2 + 0.8 * ratio}
+          fillOpacity={hasTasks ? 0.2 + 0.8 * ratio : 1}
           stroke={node.color}
           strokeWidth={1.8}
         />
