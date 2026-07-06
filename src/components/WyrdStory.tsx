@@ -269,7 +269,13 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
             </g>
           </g>
 
-          {/* screen-space overlay: caption connectors from each node to its card */}
+          {/* screen-space overlay: caption connectors from each node to its card.
+              Desktop draws one per simultaneously-visible beat, sideways into a
+              floating card. Mobile only ever shows one active beat (no room for
+              side-by-side cards on a narrow screen), so instead it gets a single
+              connector running DOWN from that beat's real node to the fixed
+              bottom card — same "the tooltip extends from the branch" language,
+              just vertical instead of horizontal. */}
           <g>
             {!isNarrow &&
               BEATS.map((b, i) => {
@@ -290,6 +296,24 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
                   </g>
                 );
               })}
+            {isNarrow &&
+              activeBeat &&
+              (() => {
+                const nx = sx(activeBeat.lane);
+                // Clamp the node end into the safe band too, so the connector's
+                // top point can't shoot up under the header on beats whose node
+                // has scrolled close to it.
+                const nodeY = Math.min(Math.max(syOf(activeBeat.day), availTop + 12), availBottom - 12);
+                const cardTopY = availBottom + 10;
+                const cx2 = vp.w / 2;
+                return (
+                  <g opacity={activeOp}>
+                    <line x1={nx} y1={nodeY} x2={cx2} y2={cardTopY} stroke={activeBeat.accent} strokeWidth={1.25} />
+                    <circle cx={nx} cy={nodeY} r={3.5} fill="none" stroke={activeBeat.accent} strokeWidth={1.5} />
+                    <circle cx={cx2} cy={cardTopY} r={2.5} fill={activeBeat.accent} />
+                  </g>
+                );
+              })()}
           </g>
         </svg>
 
