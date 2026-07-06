@@ -106,7 +106,7 @@ function beatOpacity(frontier: number, day: number): number {
   return 0;
 }
 
-export default function WyrdStory({ trackVh = 560 }: { trackVh?: number }) {
+export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [frontier, setFrontier] = useState(0);
   const [vp, setVp] = useState({ w: 1200, h: 800 });
@@ -118,23 +118,29 @@ export default function WyrdStory({ trackVh = 560 }: { trackVh?: number }) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // react-spring smoothed document scroll -> fractional frontier day over this
-  // section's pin range (trackTop .. trackTop + (trackH - viewport)).
+  // react-spring smoothed document scroll -> fractional frontier day. The reveal
+  // starts PRE px BEFORE the section pins, so the trajectory is already drawing
+  // itself in as the section slides up into view — no empty gap after the hero.
   useScroll({
     config: { tension: 260, friction: 42 },
     onChange: ({ value }) => {
       const el = trackRef.current;
       if (!el) return;
-      const len = Math.max(1, el.offsetHeight - window.innerHeight);
-      const rel = ((value.scrollY as number) - el.offsetTop) / len;
+      const vh = window.innerHeight;
+      const PRE = vh * 0.7;
+      const len = Math.max(1, el.offsetHeight - vh);
+      const rel = ((value.scrollY as number) - (el.offsetTop - PRE)) / (len + PRE);
       setFrontier(clamp(rel) * LAST);
     },
   });
 
   const isNarrow = vp.w < 760;
   const cx = vp.w / 2 - MAIN_X;
-  const centerY = vp.h / 2;
-  const cameraY = centerY - dayY(frontier);
+  // Anchor the drawing frontier lower on desktop so the trajectory fills more of
+  // the screen (less empty space below); higher on mobile so the single caption
+  // card has clear room beneath the graph.
+  const anchorY = vp.h * (isNarrow ? 0.4 : 0.64);
+  const cameraY = anchorY - dayY(frontier);
   // reveal a touch beyond the frontier so a node is fully drawn as we reach it
   const revealH = dayY(frontier) + GEOMETRY.nodeRadius + 3;
 
@@ -142,8 +148,22 @@ export default function WyrdStory({ trackVh = 560 }: { trackVh?: number }) {
   const sx = (lane: keyof typeof LANES) => cx + laneX(lane);
   const syOf = (day: number) => cameraY + dayY(day);
 
-  const CARD_W = isNarrow ? Math.min(300, vp.w - 48) : 300;
-  const GAP = isNarrow ? 0 : 78;
+  const CARD_W = isNarrow ? Math.min(360, vp.w - 32) : 300;
+  const GAP = 78;
+
+  // On narrow screens side cards can't fit without overlapping each other, so we
+  // show only the single most-relevant beat as a bottom tooltip.
+  let activeBeat: Beat | null = null;
+  let activeOp = 0;
+  if (isNarrow) {
+    for (const b of BEATS) {
+      const o = beatOpacity(frontier, b.day);
+      if (o > activeOp) {
+        activeOp = o;
+        activeBeat = b;
+      }
+    }
+  }
 
   return (
     <section ref={trackRef} className="relative" style={{ height: `${trackVh}vh` }}>
@@ -205,61 +225,75 @@ export default function WyrdStory({ trackVh = 560 }: { trackVh?: number }) {
           </g>
         </svg>
 
-        {/* —— captions (HTML for crisp type), positioned per beat —— */}
-        {BEATS.map((b, i) => {
-          const op = beatOpacity(frontier, b.day);
-          if (op <= 0.01) return null;
-          const ny = syOf(b.day);
-          const slide = (1 - op) * (b.side === "left" ? -28 : 28);
-
-          const style: React.CSSProperties = isNarrow
-            ? {
-                left: "50%",
-                top: centerY + 150,
-                width: CARD_W,
-                transform: `translateX(-50%) translateY(${(1 - op) * 20}px)`,
-                opacity: op,
-              }
-            : {
-                left: b.side === "left" ? sx(b.lane) - GAP - CARD_W : sx(b.lane) + GAP,
-                top: ny,
-                width: CARD_W,
-                transform: `translateY(-50%) translateX(${slide}px)`,
-                opacity: op,
-              };
-
-          return (
-            <div key={`b${i}`} className="pointer-events-none absolute" style={style}>
+        {/* —— captions (HTML for crisp type) —— */}
+        {isNarrow
+          ? activeBeat && (
               <div
-                className="rounded-lg border px-4 py-3"
+                className="pointer-events-none absolute left-1/2"
                 style={{
-                  background: paperCard,
-                  borderColor: b.accent,
-                  boxShadow: "0 6px 22px -10px rgba(58,46,28,0.4)",
-                  textAlign: isNarrow ? "center" : b.side === "left" ? "right" : "left",
+                  bottom: 32,
+                  width: CARD_W,
+                  transform: `translateX(-50%) translateY(${(1 - activeOp) * 16}px)`,
+                  opacity: activeOp,
                 }}
               >
-                <div
-                  className="font-[family-name:var(--font-cinzel)]"
-                  style={{ fontSize: 10, letterSpacing: "0.22em", color: b.accent }}
-                >
-                  {b.chapter} · {b.meta}
-                </div>
-                <div
-                  className="mt-1 font-[family-name:var(--font-cinzel)] font-bold"
-                  style={{ fontSize: 18, color: ink, lineHeight: 1.2 }}
-                >
-                  {b.title}
-                </div>
-                <p className="mt-1.5" style={{ fontSize: 13.5, lineHeight: 1.4, color: inkSoft }}>
-                  {b.body}
-                </p>
+                <CaptionCard beat={activeBeat} align="center" />
               </div>
-            </div>
-          );
-        })}
+            )
+          : BEATS.map((b, i) => {
+              const op = beatOpacity(frontier, b.day);
+              if (op <= 0.01) return null;
+              const ny = syOf(b.day);
+              const slide = (1 - op) * (b.side === "left" ? -28 : 28);
+              return (
+                <div
+                  key={`b${i}`}
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: b.side === "left" ? sx(b.lane) - GAP - CARD_W : sx(b.lane) + GAP,
+                    top: ny,
+                    width: CARD_W,
+                    transform: `translateY(-50%) translateX(${slide}px)`,
+                    opacity: op,
+                  }}
+                >
+                  <CaptionCard beat={b} align={b.side === "left" ? "right" : "left"} />
+                </div>
+              );
+            })}
       </div>
     </section>
+  );
+}
+
+/** The tooltip card body — chapter/meta eyebrow, title, and description. */
+function CaptionCard({ beat, align }: { beat: Beat; align: "left" | "right" | "center" }) {
+  return (
+    <div
+      className="rounded-lg border px-4 py-3"
+      style={{
+        background: paperCard,
+        borderColor: beat.accent,
+        boxShadow: "0 6px 22px -10px rgba(58,46,28,0.4)",
+        textAlign: align,
+      }}
+    >
+      <div
+        className="font-[family-name:var(--font-cinzel)]"
+        style={{ fontSize: 10, letterSpacing: "0.22em", color: beat.accent }}
+      >
+        {beat.chapter} · {beat.meta}
+      </div>
+      <div
+        className="mt-1 font-[family-name:var(--font-cinzel)] font-bold"
+        style={{ fontSize: 18, color: ink, lineHeight: 1.2 }}
+      >
+        {beat.title}
+      </div>
+      <p className="mt-1.5" style={{ fontSize: 13.5, lineHeight: 1.4, color: inkSoft }}>
+        {beat.body}
+      </p>
+    </div>
   );
 }
 
