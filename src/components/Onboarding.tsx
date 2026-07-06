@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { useWyrdStore } from "@/lib/store/useWyrdStore";
 import CollapsingHero from "@/components/CollapsingHero";
+import WyrdStory from "@/components/WyrdStory";
 
 const DEFAULT_TASKS = [""];
 
@@ -47,6 +48,10 @@ export default function Onboarding() {
           main, the line everything else is measured against.
         </p>
       </CollapsingHero>
+
+      {/* Scrollytelling explainer — the trajectory draws itself in with its
+          branches and commit tooltips, then hands off to the form below. */}
+      <WyrdStory />
 
       {/* min-h-screen so that when the hero pin releases, this section's top
           aligns to the viewport top and the form sits right under the header
