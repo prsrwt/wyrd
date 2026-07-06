@@ -122,17 +122,11 @@ export default function CollapsingHero({
             className="relative mx-auto w-full"
             style={{ maxWidth, opacity: logoOpacity, transform: logoTransform, transformOrigin: "center top" }}
           >
-            <div className="flex items-center justify-center gap-5">
-              <div
-                className="overflow-hidden rounded-2xl shadow-[0_2px_8px_rgba(58,46,28,.25)]"
-                style={{ width: 168, height: 168 * 0.9 }}
-              >
+            <div className="flex items-center justify-center gap-4 sm:gap-5">
+              <div className="h-[115px] w-[128px] overflow-hidden rounded-2xl shadow-[0_2px_8px_rgba(58,46,28,.25)] sm:h-[151px] sm:w-[168px]">
                 <WyrdLogo showWordmark={false} className="h-full w-full" />
               </div>
-              <span
-                className="font-[family-name:var(--font-cinzel)] font-bold leading-none tracking-[0.06em] text-[var(--ink)]"
-                style={{ fontSize: 168 * 0.48 }}
-              >
+              <span className="font-[family-name:var(--font-cinzel)] text-[54px] font-bold leading-none tracking-[0.06em] text-[var(--ink)] sm:text-[80px]">
                 Wyrd
               </span>
             </div>
@@ -164,17 +158,25 @@ export default function CollapsingHero({
 
       {/* Compact header */}
       <animated.div
-        style={{ opacity: barOpacity, transform: barTransform, pointerEvents: barPointer }}
-        className="parchment-surface fixed inset-x-0 top-0 z-20 shadow-[0_10px_30px_-12px_rgba(58,46,28,0.18)]"
+        style={{
+          opacity: barOpacity,
+          transform: barTransform,
+          pointerEvents: barPointer,
+          // Feather the bottom edge to transparent so the header dissolves into
+          // the body — no border, no shadow, no visible seam against the dots.
+          WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 58%, transparent 100%)",
+          maskImage: "linear-gradient(to bottom, #000 0%, #000 58%, transparent 100%)",
+        }}
+        className="parchment-surface fixed inset-x-0 top-0 z-20"
       >
-        <div className="mx-auto flex items-center gap-3.5 px-5 py-3" style={{ maxWidth }}>
-          <div className="h-12 w-12 overflow-hidden rounded-xl">
+        <div className="mx-auto flex items-center gap-3.5 px-5 pt-3 pb-9" style={{ maxWidth }}>
+          <div className="h-11 w-11 overflow-hidden rounded-xl sm:h-12 sm:w-12">
             <WyrdLogo showWordmark={false} className="h-full w-full" />
           </div>
-          <span className="font-[family-name:var(--font-cinzel)] text-[19px] font-bold tracking-[0.06em] text-[var(--ink)]">
+          <span className="font-[family-name:var(--font-cinzel)] text-[18px] font-bold tracking-[0.06em] text-[var(--ink)] sm:text-[19px]">
             Wyrd
           </span>
-          <span className="truncate font-[family-name:var(--font-cinzel)] text-[11px] tracking-[0.22em] text-[var(--ink-soft)]">
+          <span className="truncate font-[family-name:var(--font-cinzel)] text-[10px] tracking-[0.22em] text-[var(--ink-soft)] sm:text-[11px]">
             {eyebrow}
           </span>
         </div>

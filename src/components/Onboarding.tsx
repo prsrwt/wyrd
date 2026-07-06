@@ -41,7 +41,7 @@ export default function Onboarding() {
 
   return (
     <main className="pb-6">
-      <CollapsingHero eyebrow="DECLARE YOUR TRAJECTORY" maxWidth="480px" trackVh={130}>
+      <CollapsingHero eyebrow="WEAVE YOUR WYRD" maxWidth="480px" trackVh={130}>
         <p className="mt-2 text-[15px] italic text-[var(--ink-soft)]">
           Your life gets a repository. Name where you&apos;re headed — this becomes
           main, the line everything else is measured against.
