@@ -25,7 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useScroll } from "@react-spring/web";
 import { sampleGraph } from "@/lib/graph/sampleGraph";
-import { COLORS, GEOMETRY, LANES } from "@/lib/graph/theme";
+import { COLORS, GEOMETRY, LANES, hexToRgba } from "@/lib/graph/theme";
 import { dayY, laneX, renderEdge } from "@/lib/graph/layout";
 import type { GraphNode } from "@/lib/graph/types";
 
@@ -197,7 +197,7 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   // node is still fading in/out at the trailing edge of visibility.
   const clampCaptionY = (y: number) => Math.min(Math.max(y, availTop + 90), availBottom - 90);
 
-  const CARD_W = isNarrow ? Math.min(360, vp.w - 32) : 300;
+  const CARD_W = isNarrow ? Math.min(300, vp.w - 40) : 248;
   const GAP = 78;
 
   // On narrow screens side cards can't fit without overlapping each other, so we
@@ -387,31 +387,43 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   );
 }
 
-/** The tooltip card body — chapter/meta eyebrow, title, and description. */
+/**
+ * The tooltip body — a soft, airy "frosted lozenge" (atmos-style) rather than a
+ * hard bordered card: translucent parchment with a backdrop blur so the graph
+ * line reads faintly through it, a hair-thin accent inset ring instead of a
+ * solid border, and a small oval pill badge for the chapter/meta line.
+ */
 function CaptionCard({ beat, align }: { beat: Beat; align: "left" | "right" | "center" }) {
   return (
     <div
-      className="rounded-lg border px-4 py-3"
+      className="rounded-[26px] px-5 py-3.5 backdrop-blur-md"
       style={{
-        background: paperCard,
-        borderColor: beat.accent,
-        boxShadow: "0 6px 22px -10px rgba(58,46,28,0.4)",
+        background: hexToRgba(paperCard, 0.62),
+        boxShadow: `0 12px 32px -16px rgba(58,46,28,0.5), inset 0 0 0 1px ${hexToRgba(beat.accent, 0.28)}`,
         textAlign: align,
       }}
     >
-      <div
-        className="font-[family-name:var(--font-cinzel)]"
-        style={{ fontSize: 10, letterSpacing: "0.22em", color: beat.accent }}
+      {/* Only the meta (day + kind) goes in the oval pill — short enough to stay
+          one line. The chapter would make it wrap; the title already carries
+          that framing. */}
+      <span
+        className="inline-block whitespace-nowrap rounded-full px-2.5 py-[3px] font-[family-name:var(--font-cinzel)]"
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.16em",
+          color: beat.accent,
+          background: hexToRgba(beat.accent, 0.12),
+        }}
       >
-        {beat.chapter} · {beat.meta}
-      </div>
+        {beat.meta}
+      </span>
       <div
-        className="mt-1 font-[family-name:var(--font-cinzel)] font-bold"
-        style={{ fontSize: 18, color: ink, lineHeight: 1.2 }}
+        className="mt-2 font-[family-name:var(--font-cinzel)] font-bold"
+        style={{ fontSize: 15, color: ink, lineHeight: 1.15 }}
       >
         {beat.title}
       </div>
-      <p className="mt-1.5" style={{ fontSize: 13.5, lineHeight: 1.4, color: inkSoft }}>
+      <p className="mt-1.5" style={{ fontSize: 12, lineHeight: 1.42, color: inkSoft }}>
         {beat.body}
       </p>
     </div>
