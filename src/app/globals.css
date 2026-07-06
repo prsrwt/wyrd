@@ -5,7 +5,9 @@
   --parchment: #ede0c4;
   --dot: rgba(58, 46, 28, 0.22);
   --ink: #3a2e1c;
-  --ink-soft: #7a6a4a;
+  /* WCAG AA requires >=4.5:1 for normal text; the previous #7a6a4a only hit
+     ~4.02:1 against the parchment page background. This hits ~5.1:1. */
+  --ink-soft: #6b5a3d;
   --magenta: #c2185b;
   --gold: #b8912f;
   --teal: #2c7a72;
@@ -22,14 +24,57 @@
   --color-parchment: var(--parchment);
 }
 
+/* Lenis smooth-scroll (root mode). Lets the document size itself naturally and
+   disables native smooth-scroll so it doesn't fight Lenis's animation. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.parchment-surface {
+  background-color: var(--parchment);
+  background-image: radial-gradient(circle, var(--dot) 1.4px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+
 body {
   margin: 0;
   color: var(--ink);
   font-family: var(--font-crimson), Georgia, serif;
-  background-color: var(--parchment);
-  background-image: radial-gradient(circle, var(--dot) 1.4px, transparent 1.4px);
-  background-size: 22px 22px;
-  overflow-x: hidden;
+  /* `clip`, not `hidden`: hidden turns body into a scroll container, which
+     breaks the `position: sticky` pin the scrollytelling hero relies on.
+     `overflow-x: clip` prevents horizontal scroll without that side effect. */
+  overflow-x: clip;
+}
+
+/* Explicit placeholder color — browser UA defaults vary in contrast and
+   aren't guaranteed to meet WCAG AA. */
+::placeholder {
+  color: var(--ink-soft);
+  opacity: 1;
+}
+
+/* Gentle bob for the hero's scroll-down cue. */
+@keyframes wyrd-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+.wyrd-bob {
+  animation: wyrd-bob 1.8s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

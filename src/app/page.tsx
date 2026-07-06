@@ -1,22 +1,36 @@
+"use client";
+
 import WyrdGraph from "@/components/WyrdGraph";
 import Legend from "@/components/Legend";
-import { sampleGraph } from "@/lib/graph/sampleGraph";
+import Onboarding from "@/components/Onboarding";
+import CommitSheet from "@/components/CommitSheet";
+import CollapsingHero from "@/components/CollapsingHero";
+import { useWyrdStore } from "@/lib/store/useWyrdStore";
+import { deriveGraph } from "@/lib/graph/deriveGraph";
 
 export default function Home() {
+  const { state } = useWyrdStore();
+
+  if (!state.trajectory) {
+    return <Onboarding />;
+  }
+
+  const model = deriveGraph({
+    trajectory: state.trajectory,
+    branches: state.branches,
+    commits: state.commits,
+  });
+
+  const eyebrow = state.trajectory.title.toUpperCase();
+
   return (
     <main>
-      <header className="mx-auto max-w-[520px] px-5 pt-[22px] pb-2">
-        <div className="font-[family-name:var(--font-cinzel)] text-[11px] tracking-[0.32em] text-[var(--ink-soft)]">
-          PROTOTYPE · PHASE 1 — THE GRAPH
-        </div>
-        <h1 className="mt-[6px] mb-[2px] font-[family-name:var(--font-cinzel)] text-[clamp(24px,6vw,34px)] font-bold tracking-[0.04em]">
-          ⚔ Wyrd
-        </h1>
-        <div className="text-[15px] italic text-[var(--ink-soft)]">weave your wyrd</div>
-      </header>
+      <CollapsingHero eyebrow={eyebrow} trackVh={125}>
+        <div className="mt-2 text-[15px] italic text-[var(--ink-soft)]">weave your wyrd</div>
+      </CollapsingHero>
 
-      <div className="mx-auto max-w-[520px] px-0 pt-[10px] pb-[80px]">
-        <WyrdGraph model={sampleGraph} />
+      <div className="mx-auto max-w-[520px] px-0 pt-[10px] pb-[160px]">
+        <WyrdGraph model={model} />
       </div>
 
       <Legend />
@@ -24,6 +38,8 @@ export default function Home() {
       <footer className="px-5 pb-[30px] text-center text-[13px] italic text-[var(--ink-soft)]">
         stay true to yourself · stay true to keep an accurate history
       </footer>
+
+      <CommitSheet />
     </main>
   );
 }

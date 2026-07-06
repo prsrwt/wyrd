@@ -29,7 +29,7 @@ export const GEOMETRY = {
 export const LANES = {
   drift: 64,
   main: 168,
-  cert: 272,
+  side: 272,
 } as const;
 
 export type LaneId = keyof typeof LANES;

@@ -1,0 +1,12 @@
+{
+  "name": "Wyrd — weave your wyrd",
+  "short_name": "Wyrd",
+  "description": "A version control for your life: declare a trajectory, commit daily, and see honestly where you drifted and where you recovered.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EDE0C4",
+  "theme_color": "#C2185B",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

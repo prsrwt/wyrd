@@ -23,9 +23,9 @@ const edges: Edge[] = [
   { kind: "spine", lane: "main", fromDay: 26, toDay: 33, style: { color: magenta, width: 4 } },
 
   // —— certification side branch ——
-  { kind: "connector", fromLane: "main", fromDay: 6, toLane: "cert", toDay: 7, style: { color: teal, width: 2.5 } },
-  { kind: "spine", lane: "cert", fromDay: 7, toDay: 13, style: { color: teal, width: 2.5 } },
-  { kind: "connector", fromLane: "cert", fromDay: 13, toLane: "main", toDay: 14, style: { color: gold, width: 2.5 } },
+  { kind: "connector", fromLane: "main", fromDay: 6, toLane: "side", toDay: 7, style: { color: teal, width: 2.5 } },
+  { kind: "spine", lane: "side", fromDay: 7, toDay: 13, style: { color: teal, width: 2.5 } },
+  { kind: "connector", fromLane: "side", fromDay: 13, toLane: "main", toDay: 14, style: { color: gold, width: 2.5 } },
 
   // —— drift branch —— (dashed while merely watched, solid once main is absorbed)
   { kind: "connector", fromLane: "main", fromDay: 14, toLane: "drift", toDay: 15, style: { color: drift, width: 2, dashed: true, opacity: 0.8 } },
@@ -65,10 +65,10 @@ const mainNodes: GraphNode[] = [
 ];
 
 const certNodes: GraphNode[] = [
-  { day: 7, lane: "cert", kind: "commit", done: 3, total: 3, msg: "feat: course — module 1", color: teal },
-  { day: 9, lane: "cert", kind: "commit", done: 2, total: 3, msg: "feat: deep dive", color: teal },
-  { day: 11, lane: "cert", kind: "commit", done: 3, total: 3, msg: "feat: hands-on module", color: teal },
-  { day: 13, lane: "cert", kind: "commit", done: 3, total: 3, msg: "feat: passed practice exam", color: teal },
+  { day: 7, lane: "side", kind: "commit", done: 3, total: 3, msg: "feat: course — module 1", color: teal },
+  { day: 9, lane: "side", kind: "commit", done: 2, total: 3, msg: "feat: deep dive", color: teal },
+  { day: 11, lane: "side", kind: "commit", done: 3, total: 3, msg: "feat: hands-on module", color: teal },
+  { day: 13, lane: "side", kind: "commit", done: 3, total: 3, msg: "feat: passed practice exam", color: teal },
 ];
 
 const driftNodes: GraphNode[] = [
