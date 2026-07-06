@@ -218,7 +218,7 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   // instead of docked to a fixed spot at the bottom. Picks above/below based on
   // which half of the safe band the node currently sits in, so the card is
   // never asked to overflow past the header or the bottom edge.
-  const MOBILE_GAP = 40;
+  const MOBILE_GAP = 52;
   let activeNodeX = 0;
   let activeNodeY = 0;
   let activePlaceBelow = true;
@@ -228,6 +228,12 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
     activePlaceBelow = activeNodeY <= anchorY;
   }
   const activeAnchorY = activePlaceBelow ? activeNodeY + MOBILE_GAP : activeNodeY - MOBILE_GAP;
+  // Where the connector meets the card edge: offset to one side of centre so the
+  // connector can curve OUT of the node instead of running straight down the
+  // branch spine (which it overlapped before). Route away from the drift lane
+  // (which sits left of main) — left for drift beats, right for everything else.
+  const activeDir = activeBeat?.lane === "drift" ? -1 : 1;
+  const activeAttachX = vp.w / 2 + activeDir * Math.min(CARD_W * 0.3, vp.w / 2 - 28);
 
   return (
     <section
@@ -310,16 +316,17 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
               })}
             {isNarrow && activeBeat && (
               <g opacity={activeOp}>
-                <line
-                  x1={activeNodeX}
-                  y1={activeNodeY}
-                  x2={vp.w / 2}
-                  y2={activeAnchorY}
+                <path
+                  // S-curve out of the node to an off-centre point on the card
+                  // edge — same easing as the graph's own fork/merge connectors,
+                  // so it reads as native and never lies on the branch spine.
+                  d={`M ${activeNodeX} ${activeNodeY} C ${activeNodeX} ${(activeNodeY + activeAnchorY) / 2}, ${activeAttachX} ${(activeNodeY + activeAnchorY) / 2}, ${activeAttachX} ${activeAnchorY}`}
+                  fill="none"
                   stroke={activeBeat.accent}
                   strokeWidth={1.25}
                 />
                 <circle cx={activeNodeX} cy={activeNodeY} r={3.5} fill="none" stroke={activeBeat.accent} strokeWidth={1.5} />
-                <circle cx={vp.w / 2} cy={activeAnchorY} r={2.5} fill={activeBeat.accent} />
+                <circle cx={activeAttachX} cy={activeAnchorY} r={2.5} fill={activeBeat.accent} />
               </g>
             )}
           </g>
