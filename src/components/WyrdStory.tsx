@@ -44,7 +44,14 @@ interface Beat {
   accent: string;
 }
 
-/** The seven story beats, anchored to real days in the sample trajectory. */
+/**
+ * The seven story beats, anchored to real days in the sample trajectory. Each
+ * beat's (lane, day) must land on an actual node in `sampleGraph` — the
+ * connector line/dot is drawn at that exact coordinate, so a (lane, day) with
+ * no node there renders as a floating, disconnected line. E.g. the main->side
+ * connector edge starts at day 6, but the side lane's own first node is day
+ * 7 — the BRANCHES beat below uses 7, not the tempting-but-nodeless 6.
+ */
 const BEATS: Beat[] = [
   {
     day: 0, lane: "main", side: "left", chapter: "THE REPOSITORY", meta: "DAY 1 · 5/5 TASKS",
@@ -53,7 +60,7 @@ const BEATS: Beat[] = [
     accent: magenta,
   },
   {
-    day: 6, lane: "side", side: "right", chapter: "BRANCHES", meta: "DAY 7 · BRANCHED",
+    day: 7, lane: "side", side: "right", chapter: "BRANCHES", meta: "DAY 7 · BRANCHED",
     title: "Branch for the side-quests",
     body: "A bounded detour — a course, a certification — forks off as its own line with its own tasks, and merges back when its goal is met.",
     accent: teal,
