@@ -176,10 +176,7 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   // eyebrow on one line; mobile's stacked header needs less.
   const SAFE_TOP_FRAC = isNarrow ? 0.31 : 0.36;
   const safeTop = vp.h * SAFE_TOP_FRAC;
-  // Reserve room at the bottom for the mobile single-caption card so the graph
-  // itself never has to share that band; desktop cards float beside their node
-  // so only a small margin is needed.
-  const bottomMargin = isNarrow ? 230 : 40;
+  const bottomMargin = 40;
   const availTop = safeTop;
   const availBottom = Math.max(availTop + 160, vp.h - bottomMargin);
   const availH = availBottom - availTop;
@@ -204,7 +201,7 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   const GAP = 78;
 
   // On narrow screens side cards can't fit without overlapping each other, so we
-  // show only the single most-relevant beat as a bottom tooltip.
+  // show only the single most-relevant beat, floating near its node.
   let activeBeat: Beat | null = null;
   let activeOp = 0;
   if (isNarrow) {
@@ -216,6 +213,21 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
       }
     }
   }
+
+  // Where that single card floats — right next to its own node, like desktop,
+  // instead of docked to a fixed spot at the bottom. Picks above/below based on
+  // which half of the safe band the node currently sits in, so the card is
+  // never asked to overflow past the header or the bottom edge.
+  const MOBILE_GAP = 40;
+  let activeNodeX = 0;
+  let activeNodeY = 0;
+  let activePlaceBelow = true;
+  if (isNarrow && activeBeat) {
+    activeNodeX = sx(activeBeat.lane);
+    activeNodeY = Math.min(Math.max(syOf(activeBeat.day), availTop + 12), availBottom - 12);
+    activePlaceBelow = activeNodeY <= anchorY;
+  }
+  const activeAnchorY = activePlaceBelow ? activeNodeY + MOBILE_GAP : activeNodeY - MOBILE_GAP;
 
   return (
     <section
@@ -296,46 +308,53 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
                   </g>
                 );
               })}
-            {isNarrow &&
-              activeBeat &&
-              (() => {
-                const nx = sx(activeBeat.lane);
-                // Clamp the node end into the safe band too, so the connector's
-                // top point can't shoot up under the header on beats whose node
-                // has scrolled close to it.
-                const nodeY = Math.min(Math.max(syOf(activeBeat.day), availTop + 12), availBottom - 12);
-                const cardTopY = availBottom + 10;
-                const cx2 = vp.w / 2;
-                return (
-                  <g opacity={activeOp}>
-                    <line x1={nx} y1={nodeY} x2={cx2} y2={cardTopY} stroke={activeBeat.accent} strokeWidth={1.25} />
-                    <circle cx={nx} cy={nodeY} r={3.5} fill="none" stroke={activeBeat.accent} strokeWidth={1.5} />
-                    <circle cx={cx2} cy={cardTopY} r={2.5} fill={activeBeat.accent} />
-                  </g>
-                );
-              })()}
+            {isNarrow && activeBeat && (
+              <g opacity={activeOp}>
+                <line
+                  x1={activeNodeX}
+                  y1={activeNodeY}
+                  x2={vp.w / 2}
+                  y2={activeAnchorY}
+                  stroke={activeBeat.accent}
+                  strokeWidth={1.25}
+                />
+                <circle cx={activeNodeX} cy={activeNodeY} r={3.5} fill="none" stroke={activeBeat.accent} strokeWidth={1.5} />
+                <circle cx={vp.w / 2} cy={activeAnchorY} r={2.5} fill={activeBeat.accent} />
+              </g>
+            )}
           </g>
         </svg>
 
         {/* —— captions (HTML for crisp type) —— */}
         {isNarrow
           ? pinActive && activeBeat && (
-              // `fixed`, not `absolute`: this section can render BEFORE the
-              // sticky stage has actually pinned (e.g. while it's still rising
-              // into view). An `absolute` child anchored with `bottom` would
-              // measure from the sticky container's un-stuck natural position,
-              // which can sit far below the viewport — pushing this card
-              // hundreds of px off-screen. `fixed` always measures from the
-              // real viewport, so it's correct in both the pinned and
-              // not-yet-pinned states.
+              // `absolute` + `top`/`bottom`, floating right next to the node —
+              // same language as desktop's side cards, just picking above/below
+              // instead of left/right since a narrow screen has no room to
+              // spare sideways. `top` (not `bottom`) is what makes this safe
+              // even in the brief pre-stick window right at the hero handoff:
+              // an unstuck sticky container's natural top sits at most a few
+              // tens of px off from its final pinned position, and `top`
+              // reflects that directly — `bottom` would instead multiply the
+              // error by the ~100svh container height, which is what pushed
+              // the old bottom-anchored version hundreds of px off-screen.
               <div
-                className="pointer-events-none fixed inset-x-0 z-30 mx-auto"
-                style={{
-                  bottom: 32,
-                  width: CARD_W,
-                  transform: `translateY(${(1 - activeOp) * 16}px)`,
-                  opacity: activeOp,
-                }}
+                className="pointer-events-none absolute left-1/2"
+                style={
+                  activePlaceBelow
+                    ? {
+                        top: activeAnchorY,
+                        width: CARD_W,
+                        transform: `translateX(-50%) translateY(${(1 - activeOp) * 16}px)`,
+                        opacity: activeOp,
+                      }
+                    : {
+                        bottom: vp.h - activeAnchorY,
+                        width: CARD_W,
+                        transform: `translateX(-50%) translateY(${(1 - activeOp) * -16}px)`,
+                        opacity: activeOp,
+                      }
+                }
               >
                 <CaptionCard beat={activeBeat} align="center" />
               </div>
