@@ -101,7 +101,7 @@ export default function CollapsingHero({
   return (
     <>
       <div ref={trackRef} className="relative" style={{ height: `${trackVh}vh` }}>
-        <div className="parchment-surface sticky top-0 flex h-[100svh] flex-col items-center justify-center overflow-hidden px-5">
+        <div className="sticky top-0 z-[2] flex h-[100svh] flex-col items-center justify-center overflow-hidden px-5">
           {/* Layer 0 — background glow */}
           <animated.div
             aria-hidden
@@ -146,10 +146,10 @@ export default function CollapsingHero({
           {/* Scroll cue */}
           <animated.div
             style={{ opacity: cueOpacity, transform: cueTransform }}
-            className="pointer-events-none absolute inset-x-0 bottom-8 flex flex-col items-center gap-1 text-[var(--ink-soft)]"
+            className="pointer-events-none absolute inset-x-0 bottom-16 flex flex-col items-center gap-1.5 text-[var(--ink)]"
           >
-            <span className="font-[family-name:var(--font-cinzel)] text-[10px] tracking-[0.28em]">SCROLL</span>
-            <span className="wyrd-bob text-[18px] leading-none" aria-hidden>
+            <span className="font-[family-name:var(--font-cinzel)] text-[11px] tracking-[0.3em]">SCROLL</span>
+            <span className="wyrd-bob text-[22px] leading-none" aria-hidden>
               ↓
             </span>
           </animated.div>
@@ -157,26 +157,20 @@ export default function CollapsingHero({
       </div>
 
       {/* Compact header */}
+      {/* Transparent, static header — the page scrolls under it. No background,
+          so the parchment + graph read as one continuously scrolling surface. */}
       <animated.div
-        style={{
-          opacity: barOpacity,
-          transform: barTransform,
-          pointerEvents: barPointer,
-          // Feather the bottom edge to transparent so the header dissolves into
-          // the body — no border, no shadow, no visible seam against the dots.
-          WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 58%, transparent 100%)",
-          maskImage: "linear-gradient(to bottom, #000 0%, #000 58%, transparent 100%)",
-        }}
-        className="parchment-surface fixed inset-x-0 top-0 z-20"
+        style={{ opacity: barOpacity, transform: barTransform, pointerEvents: barPointer }}
+        className="fixed inset-x-0 top-0 z-20"
       >
-        <div className="mx-auto flex items-center gap-3.5 px-5 pt-3 pb-9" style={{ maxWidth }}>
-          <div className="h-11 w-11 overflow-hidden rounded-xl sm:h-12 sm:w-12">
+        <div className="mx-auto flex items-center gap-4 px-5 py-4" style={{ maxWidth }}>
+          <div className="h-12 w-12 overflow-hidden rounded-xl sm:h-14 sm:w-14">
             <WyrdLogo showWordmark={false} className="h-full w-full" />
           </div>
-          <span className="font-[family-name:var(--font-cinzel)] text-[18px] font-bold tracking-[0.06em] text-[var(--ink)] sm:text-[19px]">
+          <span className="font-[family-name:var(--font-cinzel)] text-[22px] font-bold tracking-[0.06em] text-[var(--ink)] sm:text-[26px]">
             Wyrd
           </span>
-          <span className="truncate font-[family-name:var(--font-cinzel)] text-[10px] tracking-[0.22em] text-[var(--ink-soft)] sm:text-[11px]">
+          <span className="truncate font-[family-name:var(--font-cinzel)] text-[12px] tracking-[0.22em] text-[var(--ink-soft)] sm:text-[13px]">
             {eyebrow}
           </span>
         </div>

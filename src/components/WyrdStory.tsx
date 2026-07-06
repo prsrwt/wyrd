@@ -14,10 +14,12 @@
  *   - the graph theme + layout math (`laneX`, `dayY`, `renderEdge`) for geometry.
  *
  * Mechanics: react-spring's `useScroll` gives a smoothed document scrollY; we
- * map it to a fractional `frontier` day over this section's own pin range, then
- * derive the camera translate, a reveal clip, and each caption's opacity from
- * that one number (same one-source-of-truth approach as CollapsingHero, which
- * avoids the framer useTransform inconsistency).
+ * map it to a fractional `frontier` day over this section's pin range only —
+ * starting at the handoff scroll position (~scrollY 31 mobile / ~72 desktop),
+ * when the hero pin releases and this stage pins. The section overlaps the hero
+ * by 100svh so that handoff is early, not a viewport later (~scrollY 331).
+ * Graph + captions stay hidden until handoff, then fade in over ~48px. Header
+ * clearance uses 31%/36% of viewport height (safeTop), not scrollY pixels.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -92,23 +94,31 @@ const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 
 /**
  * Opacity for a caption given the current frontier day. Fades in ~1.5 days
- * before the node reaches centre, holds while it scrolls up, fades out by ~8.5
- * days past — wide enough that consecutive beats overlap slightly (no blank
- * stretches). Sides are assigned so no two simultaneously-visible cards share a
- * side.
+ * before the node reaches centre, holds while it scrolls up, fades out by ~7
+ * days past — enough overlap that consecutive beats don't leave blank stretches,
+ * but past beats don't linger as unreadable ghosts. Sides are assigned so no
+ * two simultaneously-visible cards share a side.
  */
 function beatOpacity(frontier: number, day: number): number {
   const d = frontier - day;
   if (d < -1.5) return 0;
   if (d < 0) return clamp((d + 1.5) / 1.5);
-  if (d < 6) return 1;
-  if (d < 8.5) return clamp(1 - (d - 6) / 2.5);
+  if (d < 5) return 1;
+  if (d < 7) return clamp(1 - (d - 5) / 2);
   return 0;
 }
 
 export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [frontier, setFrontier] = useState(0);
+  const [storyReveal, setStoryReveal] = useState(0);
+  // Whether the pin is still the active view. `frontier` clamps at LAST once
+  // you scroll past the section and never goes back down, so it can't tell us
+  // this on its own. Needed because the mobile caption below uses `fixed`
+  // positioning (see its comment) — unlike an `absolute` child, a `fixed` one
+  // does NOT scroll away with its section, so without this gate the final
+  // beat's card would stay glued to the viewport forever, overlapping the form.
+  const [pinActive, setPinActive] = useState(true);
   const [vp, setVp] = useState({ w: 1200, h: 800 });
 
   useEffect(() => {
@@ -118,28 +128,59 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // react-spring smoothed document scroll -> fractional frontier day. The reveal
-  // starts PRE px BEFORE the section pins, so the trajectory is already drawing
-  // itself in as the section slides up into view — no empty gap after the hero.
+  // react-spring smoothed document scroll -> fractional frontier day.
+  //
+  // offsetTop ≈ hero pin length because of `-mt-[100svh]`. Frontier waits for
+  // that handoff scroll position (the hero has released and this stage pins)
+  // so day-by-day progression starts from a clean zero.
+  //
+  // storyReveal (opacity) does NOT wait for the same point, though: the hero's
+  // own logo/support text finish fading out at ~0.58 of ITS pin — i.e. at
+  // ~0.58 * handoff, since handoff === the hero's pin length here — which is
+  // well BEFORE this stage's exact handoff. Gating the fade-in at handoff too
+  // left a blank stretch (confirmed by screenshot: hero gone by scrollY ~39,
+  // story still invisible until scrollY ~68 on a mobile-height viewport) where
+  // neither the hero nor the graph was visible. Starting the ramp earlier
+  // closes that gap so the two cross-fade instead of leaving a hole.
   useScroll({
     config: { tension: 260, friction: 42 },
     onChange: ({ value }) => {
       const el = trackRef.current;
       if (!el) return;
       const vh = window.innerHeight;
-      const PRE = vh * 0.7;
-      const len = Math.max(1, el.offsetHeight - vh);
-      const rel = ((value.scrollY as number) - (el.offsetTop - PRE)) / (len + PRE);
-      setFrontier(clamp(rel) * LAST);
+      const y = value.scrollY as number;
+      const handoff = el.offsetTop;
+      const pinLen = Math.max(1, el.offsetHeight - vh);
+      const pastHandoff = Math.max(0, y - handoff);
+      setFrontier(clamp(pastHandoff / pinLen) * LAST);
+      setPinActive(y <= handoff + pinLen);
+
+      const revealStart = handoff * 0.55;
+      const revealSpan = Math.max(1, handoff + 48 - revealStart);
+      setStoryReveal(clamp((y - revealStart) / revealSpan));
     },
   });
 
   const isNarrow = vp.w < 760;
   const cx = vp.w / 2 - MAIN_X;
-  // Anchor the drawing frontier lower on desktop so the trajectory fills more of
-  // the screen (less empty space below); higher on mobile so the single caption
-  // card has clear room beneath the graph.
-  const anchorY = vp.h * (isNarrow ? 0.4 : 0.64);
+
+  // Header clearance band — fraction of viewport height, NOT a scrollY pixel
+  // trigger. Desktop needs more room because the compact header runs logo +
+  // eyebrow on one line; mobile's stacked header needs less.
+  const SAFE_TOP_FRAC = isNarrow ? 0.31 : 0.36;
+  const safeTop = vp.h * SAFE_TOP_FRAC;
+  // Reserve room at the bottom for the mobile single-caption card so the graph
+  // itself never has to share that band; desktop cards float beside their node
+  // so only a small margin is needed.
+  const bottomMargin = isNarrow ? 230 : 40;
+  const availTop = safeTop;
+  const availBottom = Math.max(availTop + 160, vp.h - bottomMargin);
+  const availH = availBottom - availTop;
+
+  // Anchor the currently-drawing frontier at the vertical centre of that
+  // available band — dynamic, so it re-centres automatically at any viewport
+  // size instead of leaving a fixed, screen-size-dependent gap.
+  const anchorY = availTop + availH / 2;
   const cameraY = anchorY - dayY(frontier);
   // reveal a touch beyond the frontier so a node is fully drawn as we reach it
   const revealH = dayY(frontier) + GEOMETRY.nodeRadius + 3;
@@ -147,6 +188,10 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   // screen position of a (lane, day)
   const sx = (lane: keyof typeof LANES) => cx + laneX(lane);
   const syOf = (day: number) => cameraY + dayY(day);
+  // Clamp any HTML caption's vertical centre into the safe band, so a card
+  // never slides up under the header or down past the viewport edge while its
+  // node is still fading in/out at the trailing edge of visibility.
+  const clampCaptionY = (y: number) => Math.min(Math.max(y, availTop + 90), availBottom - 90);
 
   const CARD_W = isNarrow ? Math.min(360, vp.w - 32) : 300;
   const GAP = 78;
@@ -166,8 +211,13 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   }
 
   return (
-    <section ref={trackRef} className="relative" style={{ height: `${trackVh}vh` }}>
+    <section
+      ref={trackRef}
+      className="relative z-[1] -mt-[100svh]"
+      style={{ height: `${trackVh}vh` }}
+    >
       <div className="parchment-surface sticky top-0 h-[100svh] overflow-hidden">
+        <div className="absolute inset-0" style={{ opacity: storyReveal }}>
         {/* —— the graph, camera-followed and revealed —— */}
         <svg
           width={vp.w}
@@ -175,6 +225,13 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
           viewBox={`0 0 ${vp.w} ${vp.h}`}
           className="absolute inset-0"
           aria-hidden
+          style={{
+            // The graph is transparent under the (fixed, transparent) header and
+            // fades in right at the safe-zone boundary — same safeTop value that
+            // drives the layout, so the fade and the clamp always agree.
+            WebkitMaskImage: `linear-gradient(to bottom, transparent 0, transparent ${Math.max(0, safeTop - 48)}px, #000 ${safeTop}px)`,
+            maskImage: `linear-gradient(to bottom, transparent 0, transparent ${Math.max(0, safeTop - 48)}px, #000 ${safeTop}px)`,
+          }}
         >
           <defs>
             <clipPath id="wyrd-story-reveal">
@@ -212,13 +269,17 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
                 const op = beatOpacity(frontier, b.day);
                 if (op <= 0.01) return null;
                 const nx = sx(b.lane);
-                const ny = syOf(b.day);
+                // The connector still points at the node's true position, but the
+                // card end clamps into the safe band — see the matching clamp on
+                // the HTML card below.
+                const nodeY = syOf(b.day);
+                const cardY = clampCaptionY(nodeY);
                 const endX = b.side === "left" ? nx - GAP : nx + GAP;
                 return (
                   <g key={`c${i}`} opacity={op}>
-                    <line x1={nx} y1={ny} x2={endX} y2={ny} stroke={b.accent} strokeWidth={1.25} />
-                    <circle cx={nx} cy={ny} r={3.5} fill="none" stroke={b.accent} strokeWidth={1.5} />
-                    <circle cx={endX} cy={ny} r={2.5} fill={b.accent} />
+                    <line x1={nx} y1={nodeY} x2={endX} y2={cardY} stroke={b.accent} strokeWidth={1.25} />
+                    <circle cx={nx} cy={nodeY} r={3.5} fill="none" stroke={b.accent} strokeWidth={1.5} />
+                    <circle cx={endX} cy={cardY} r={2.5} fill={b.accent} />
                   </g>
                 );
               })}
@@ -227,13 +288,21 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
 
         {/* —— captions (HTML for crisp type) —— */}
         {isNarrow
-          ? activeBeat && (
+          ? pinActive && activeBeat && (
+              // `fixed`, not `absolute`: this section can render BEFORE the
+              // sticky stage has actually pinned (e.g. while it's still rising
+              // into view). An `absolute` child anchored with `bottom` would
+              // measure from the sticky container's un-stuck natural position,
+              // which can sit far below the viewport — pushing this card
+              // hundreds of px off-screen. `fixed` always measures from the
+              // real viewport, so it's correct in both the pinned and
+              // not-yet-pinned states.
               <div
-                className="pointer-events-none absolute left-1/2"
+                className="pointer-events-none fixed inset-x-0 z-30 mx-auto"
                 style={{
                   bottom: 32,
                   width: CARD_W,
-                  transform: `translateX(-50%) translateY(${(1 - activeOp) * 16}px)`,
+                  transform: `translateY(${(1 - activeOp) * 16}px)`,
                   opacity: activeOp,
                 }}
               >
@@ -243,7 +312,7 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
           : BEATS.map((b, i) => {
               const op = beatOpacity(frontier, b.day);
               if (op <= 0.01) return null;
-              const ny = syOf(b.day);
+              const top = clampCaptionY(syOf(b.day));
               const slide = (1 - op) * (b.side === "left" ? -28 : 28);
               return (
                 <div
@@ -251,7 +320,7 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
                   className="pointer-events-none absolute"
                   style={{
                     left: b.side === "left" ? sx(b.lane) - GAP - CARD_W : sx(b.lane) + GAP,
-                    top: ny,
+                    top,
                     width: CARD_W,
                     transform: `translateY(-50%) translateX(${slide}px)`,
                     opacity: op,
@@ -261,7 +330,9 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
                 </div>
               );
             })}
+        </div>
       </div>
+
     </section>
   );
 }

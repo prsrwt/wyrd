@@ -42,15 +42,15 @@ export default function Onboarding() {
 
   return (
     <main className="pb-6">
-      <CollapsingHero eyebrow="WEAVE YOUR WYRD" maxWidth="480px" trackVh={116}>
+      <CollapsingHero eyebrow="WEAVE YOUR WYRD" maxWidth="480px" trackVh={108}>
         <p className="mt-2 text-[15px] italic text-[var(--ink-soft)]">
-          Your life gets a repository. Name where you&apos;re headed — this becomes
-          main, the line everything else is measured against.
+          Scroll to see how a life takes shape — one honest day at a time.
         </p>
       </CollapsingHero>
 
-      {/* Scrollytelling explainer — the trajectory draws itself in with its
-          branches and commit tooltips, then hands off to the form below. */}
+      {/* Scrollytelling explainer — overlaps the hero by 100svh so the graph
+          can draw underneath the fading logo (atmos-style handoff at ~scrollY
+          31 mobile / ~72 desktop) instead of appearing a viewport later. */}
       <WyrdStory />
 
       {/* min-h-screen so that when the hero pin releases, this section's top
