@@ -119,13 +119,6 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [frontier, setFrontier] = useState(0);
   const [storyReveal, setStoryReveal] = useState(0);
-  // Whether the pin is still the active view. `frontier` clamps at LAST once
-  // you scroll past the section and never goes back down, so it can't tell us
-  // this on its own. Needed because the mobile caption below uses `fixed`
-  // positioning (see its comment) — unlike an `absolute` child, a `fixed` one
-  // does NOT scroll away with its section, so without this gate the final
-  // beat's card would stay glued to the viewport forever, overlapping the form.
-  const [pinActive, setPinActive] = useState(true);
   const [vp, setVp] = useState({ w: 1200, h: 800 });
 
   useEffect(() => {
@@ -160,7 +153,6 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
       const pinLen = Math.max(1, el.offsetHeight - vh);
       const pastHandoff = Math.max(0, y - handoff);
       setFrontier(clamp(pastHandoff / pinLen) * LAST);
-      setPinActive(y <= handoff + pinLen);
 
       const revealStart = handoff * 0.55;
       const revealSpan = Math.max(1, handoff + 48 - revealStart);
@@ -334,7 +326,7 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
 
         {/* —— captions (HTML for crisp type) —— */}
         {isNarrow
-          ? pinActive && activeBeat && (
+          ? activeBeat && (
               // `absolute` + `top`/`bottom`, floating right next to the node —
               // same language as desktop's side cards, just picking above/below
               // instead of left/right since a narrow screen has no room to
