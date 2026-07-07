@@ -98,13 +98,15 @@ const BEATS: Beat[] = [
 ];
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
 /**
  * Opacity for a caption given the current frontier day. Fades in ~1.5 days
  * before the node reaches centre, holds while it scrolls up, fades out by ~7
  * days past — enough overlap that consecutive beats don't leave blank stretches,
- * but past beats don't linger as unreadable ghosts. Sides are assigned so no
- * two simultaneously-visible cards share a side.
+ * but past beats don't linger as unreadable ghosts. On desktop, sides are
+ * assigned so simultaneously-visible cards rarely share one; on mobile the one
+ * tight pair that does (merge/drift) is de-collided by the stacking pass.
  */
 function beatOpacity(frontier: number, day: number): number {
   const d = frontier - day;
@@ -117,6 +119,11 @@ function beatOpacity(frontier: number, day: number): number {
 
 export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  // Merge is the only card the connector meets on its BOTTOM edge, so it's the
+  // only one whose real height must be known exactly — otherwise the tail lands
+  // in empty space below a card that renders shorter than the estimate.
+  const mergeCardRef = useRef<HTMLDivElement>(null);
+  const [mergeCardH, setMergeCardH] = useState(190);
   const [frontier, setFrontier] = useState(0);
   const [storyReveal, setStoryReveal] = useState(0);
   const [vp, setVp] = useState({ w: 1200, h: 800 });
@@ -189,43 +196,84 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   // node is still fading in/out at the trailing edge of visibility.
   const clampCaptionY = (y: number) => Math.min(Math.max(y, availTop + 90), availBottom - 90);
 
-  const CARD_W = isNarrow ? Math.min(300, vp.w - 40) : 248;
+  // Mobile cards are narrower than the viewport on purpose: the leftover width
+  // is the "open space" the card gets parked over (see the placement block).
+  const CARD_W = isNarrow ? Math.min(264, vp.w - 88) : 248;
   const GAP = 78;
 
-  // On narrow screens side cards can't fit without overlapping each other, so we
-  // show only the single most-relevant beat, floating near its node.
-  let activeBeat: Beat | null = null;
-  let activeOp = 0;
-  if (isNarrow) {
-    for (const b of BEATS) {
-      const o = beatOpacity(frontier, b.day);
-      if (o > activeOp) {
-        activeOp = o;
-        activeBeat = b;
-      }
-    }
-  }
+  // —— mobile caption geometry ————————————————————————————————————————————
+  // Base geometry for one beat's card + connector. The card sits BELOW its node
+  // and tracks it (top = node + gap), clamped into the safe band so it never
+  // rides under the header or off the bottom — and there is NO above/below
+  // switch, so nothing teleports mid-fade. Pure function of the beat, so we can
+  // lay out EVERY visible beat (each on its own beatOpacity), like desktop.
+  const MOBILE_GAP = 64; // node↔card gap; also the connector's reach, so it has room to draw
+  const MOBILE_EDGE = 16; // screen-edge margin the parked card keeps
+  const CARD_H = 210; // estimated card height (below-cards attach at their exact top edge)
+  const mobileGeom = (b: Beat) => {
+    const nodeX = sx(b.lane);
+    const nodeY = clamp(syOf(b.day), availTop + 12, availBottom - 12);
+    // Merge is the exception. Its node sits on the central main spine, so a card
+    // parked there gets the spine running straight through it. Instead it moves
+    // to the LEFT — into the slot the branches caption has just vacated (they're
+    // never on screen together) — and sits ABOVE its node, so the spine clears
+    // the card and the connector drops from the card's BOTTOM down to the node.
+    // Every other beat parks on its open side (drift left → card right, etc.)
+    // and floats just below its node.
+    const isMerge = b.chapter === "MERGE";
+    // Merge attaches on its bottom edge, so it uses its MEASURED height; the
+    // others attach on their exact top edge, where the estimate is irrelevant.
+    const h = isMerge ? mergeCardH : CARD_H;
+    const cardBottomLimit = vp.h - h - MOBILE_EDGE;
+    const cardOnLeft = isMerge
+      ? true
+      : b.lane === "drift"
+        ? false
+        : b.lane === "side"
+          ? true
+          : b.side === "left";
+    const cardLeft = cardOnLeft ? MOBILE_EDGE : vp.w - MOBILE_EDGE - CARD_W;
+    const cardTop = isMerge
+      ? clamp(nodeY - MOBILE_GAP - h, availTop + MOBILE_EDGE, cardBottomLimit)
+      : clamp(nodeY + MOBILE_GAP, availTop + MOBILE_EDGE, cardBottomLimit);
+    const cardBottom = cardTop + h;
+    // Where the connector meets the card. For side-parked cards it's the
+    // vertical edge facing the node (inset past the corner radius), so the
+    // S-curve sweeps in from the side. For merge it's a point on the BOTTOM
+    // edge, offset to the LEFT of the node — the card is wide enough to cover
+    // the node's column, so a straight drop would lie on the spine; offsetting
+    // left makes the tail sweep down-right into the diamond, clear of it.
+    const attachX = isMerge
+      ? clamp(nodeX - 40, cardLeft + 22, cardLeft + CARD_W - 22)
+      : cardOnLeft
+        ? cardLeft + CARD_W - 22
+        : cardLeft + 22;
+    return { nodeX, nodeY, cardLeft, cardOnLeft, cardTop, cardBottom, attachX, above: isMerge };
+  };
 
-  // Where that single card floats — right next to its own node, like desktop,
-  // instead of docked to a fixed spot at the bottom. Picks above/below based on
-  // which half of the safe band the node currently sits in, so the card is
-  // never asked to overflow past the header or the bottom edge.
-  const MOBILE_GAP = 52;
-  let activeNodeX = 0;
-  let activeNodeY = 0;
-  let activePlaceBelow = true;
-  if (isNarrow && activeBeat) {
-    activeNodeX = sx(activeBeat.lane);
-    activeNodeY = Math.min(Math.max(syOf(activeBeat.day), availTop + 12), availBottom - 12);
-    activePlaceBelow = activeNodeY <= anchorY;
-  }
-  const activeAnchorY = activePlaceBelow ? activeNodeY + MOBILE_GAP : activeNodeY - MOBILE_GAP;
-  // Where the connector meets the card edge: offset to one side of centre so the
-  // connector can curve OUT of the node instead of running straight down the
-  // branch spine (which it overlapped before). Route away from the drift lane
-  // (which sits left of main) — left for drift beats, right for everything else.
-  const activeDir = activeBeat?.lane === "drift" ? -1 : 1;
-  const activeAttachX = vp.w / 2 + activeDir * Math.min(CARD_W * 0.3, vp.w / 2 - 28);
+  // Every visible beat gets a card on mobile (like desktop). Placements are
+  // authored so nothing overlaps: merge floats above-left, its tight neighbour
+  // drift below-right (opposite sides), and every other consecutive pair is a
+  // full card-height or more apart. The connector attaches to whichever
+  // horizontal edge of the card faces the node — bottom when the card sits above
+  // it (merge), top when below (everyone else).
+  const mobileCards = isNarrow
+    ? BEATS.map((b) => ({ b, g: mobileGeom(b), op: beatOpacity(frontier, b.day) }))
+        .filter((x) => x.op > 0.01)
+        .map((x) => {
+          const top = x.g.cardTop;
+          const bottom = x.g.cardBottom;
+          const attachY = x.g.nodeY <= top ? top : x.g.nodeY >= bottom ? bottom : x.g.nodeY;
+          return { ...x, top, attachY };
+        })
+    : [];
+
+  // Measure the merge card's real height whenever it appears or its width
+  // changes, so its bottom edge (and the connector that meets it) are exact.
+  const mergeShown = mobileCards.some((x) => x.b.chapter === "MERGE");
+  useEffect(() => {
+    if (mergeCardRef.current) setMergeCardH(mergeCardRef.current.offsetHeight);
+  }, [mergeShown, CARD_W, isNarrow]);
 
   return (
     <section
@@ -282,10 +330,9 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
           {/* screen-space overlay: caption connectors from each node to its card.
               Desktop draws one per simultaneously-visible beat, sideways into a
               floating card. Mobile only ever shows one active beat (no room for
-              side-by-side cards on a narrow screen), so instead it gets a single
-              connector running DOWN from that beat's real node to the fixed
-              bottom card — same "the tooltip extends from the branch" language,
-              just vertical instead of horizontal. */}
+              side-by-side cards on a narrow screen), and its card is parked over
+              the empty side of the canvas — so the connector S-curves out of the
+              node, across the open space, into that card's near edge. */}
           <g>
             {!isNarrow &&
               BEATS.map((b, i) => {
@@ -306,58 +353,72 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
                   </g>
                 );
               })}
-            {isNarrow && activeBeat && (
-              <g opacity={activeOp}>
-                <path
-                  // S-curve out of the node to an off-centre point on the card
-                  // edge — same easing as the graph's own fork/merge connectors,
-                  // so it reads as native and never lies on the branch spine.
-                  d={`M ${activeNodeX} ${activeNodeY} C ${activeNodeX} ${(activeNodeY + activeAnchorY) / 2}, ${activeAttachX} ${(activeNodeY + activeAnchorY) / 2}, ${activeAttachX} ${activeAnchorY}`}
-                  fill="none"
-                  stroke={activeBeat.accent}
-                  strokeWidth={1.25}
-                />
-                <circle cx={activeNodeX} cy={activeNodeY} r={3.5} fill="none" stroke={activeBeat.accent} strokeWidth={1.5} />
-                <circle cx={activeAttachX} cy={activeAnchorY} r={2.5} fill={activeBeat.accent} />
-              </g>
-            )}
+            {isNarrow &&
+              mobileCards.map(({ b, op, g, attachY }) => {
+                // One connector per visible beat, each on its OWN beatOpacity —
+                // so consecutive beats cross-fade their connectors (matching the
+                // desktop side) instead of a single connector snapping between
+                // nodes. It lands on the card's FINAL (de-collided) edge.
+                //
+                // The connector GROWS out of its node and RETRACTS back into it
+                // as the beat fades in/out — like the graph drawing itself in.
+                // The card end travels from the node (p=0) to the card edge
+                // (p=1), so a departing connector shrinks away into its branch
+                // instead of lingering as a stray line. p eases the raw opacity
+                // so the reach accelerates out and settles in.
+                const p = smoothstep(op);
+                const endX = g.nodeX + (g.attachX - g.nodeX) * p;
+                const endY = g.nodeY + (attachY - g.nodeY) * p;
+                const midY = (g.nodeY + endY) / 2;
+                // Side-parked cards leave the node VERTICALLY then sweep to the
+                // side (graph's fork/merge easing). Merge's card sits above and
+                // over the spine, so its tail instead leaves the node
+                // HORIZONTALLY — off the spine at once — then rises to the card.
+                const d = g.above
+                  ? `M ${g.nodeX} ${g.nodeY} C ${endX} ${g.nodeY}, ${endX} ${midY}, ${endX} ${endY}`
+                  : `M ${g.nodeX} ${g.nodeY} C ${g.nodeX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`;
+                return (
+                  <g key={`mc${b.day}`} opacity={op}>
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke={b.accent}
+                      strokeWidth={1.25}
+                    />
+                    <circle cx={g.nodeX} cy={g.nodeY} r={3.5} fill="none" stroke={b.accent} strokeWidth={1.5} />
+                    <circle cx={endX} cy={endY} r={2.5} fill={b.accent} />
+                  </g>
+                );
+              })}
           </g>
         </svg>
 
         {/* —— captions (HTML for crisp type) —— */}
         {isNarrow
-          ? activeBeat && (
-              // `absolute` + `top`/`bottom`, floating right next to the node —
-              // same language as desktop's side cards, just picking above/below
-              // instead of left/right since a narrow screen has no room to
-              // spare sideways. `top` (not `bottom`) is what makes this safe
-              // even in the brief pre-stick window right at the hero handoff:
-              // an unstuck sticky container's natural top sits at most a few
-              // tens of px off from its final pinned position, and `top`
-              // reflects that directly — `bottom` would instead multiply the
-              // error by the ~100svh container height, which is what pushed
-              // the old bottom-anchored version hundreds of px off-screen.
+          ? mobileCards.map(({ b, op, g, top }) => (
+              // One card per visible beat, parked to its open side and floating
+              // just below its node (de-collided top). `top` (never `bottom`) is
+              // what makes this safe even in the brief pre-stick window at the
+              // hero handoff: an unstuck sticky container's natural top sits at
+              // most a few tens of px off its final pinned position, and `top`
+              // reflects that directly — `bottom` would multiply the error by the
+              // ~100svh container height, pushing it hundreds of px off-screen.
               <div
-                className="pointer-events-none absolute left-1/2"
-                style={
-                  activePlaceBelow
-                    ? {
-                        top: activeAnchorY,
-                        width: CARD_W,
-                        transform: `translateX(-50%) translateY(${(1 - activeOp) * 16}px)`,
-                        opacity: activeOp,
-                      }
-                    : {
-                        bottom: vp.h - activeAnchorY,
-                        width: CARD_W,
-                        transform: `translateX(-50%) translateY(${(1 - activeOp) * -16}px)`,
-                        opacity: activeOp,
-                      }
-                }
+                key={`mcard${b.day}`}
+                ref={b.chapter === "MERGE" ? mergeCardRef : undefined}
+                className="pointer-events-none absolute"
+                style={{
+                  left: g.cardLeft,
+                  top,
+                  width: CARD_W,
+                  transform: `translateY(${(1 - op) * 16}px)`,
+                  opacity: op,
+                }}
               >
-                <CaptionCard beat={activeBeat} align="center" />
+                {/* text hugs the node side, like the desktop side cards do */}
+                <CaptionCard beat={b} align={g.cardOnLeft ? "right" : "left"} />
               </div>
-            )
+            ))
           : BEATS.map((b, i) => {
               const op = beatOpacity(frontier, b.day);
               if (op <= 0.01) return null;
