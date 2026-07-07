@@ -48,9 +48,13 @@ interface Beat {
  * The seven story beats, anchored to real days in the sample trajectory. Each
  * beat's (lane, day) must land on an actual node in `sampleGraph` — the
  * connector line/dot is drawn at that exact coordinate, so a (lane, day) with
- * no node there renders as a floating, disconnected line. E.g. the main->side
- * connector edge starts at day 6, but the side lane's own first node is day
- * 7 — the BRANCHES beat below uses 7, not the tempting-but-nodeless 6.
+ * no node there renders as a floating, disconnected line.
+ *
+ * Anchors are spaced 9 days apart (0/9/18/27/36/45/54). That gap is wider than
+ * a caption's visible window (`beatOpacity` spans ~day-1.5 → day+7), so no two
+ * captions are ever on screen at once — which is what keeps the mobile cards
+ * from overlapping, since a lone card has nothing to collide with. Keep the
+ * ≥9-day spacing (and matching nodes in `sampleGraph`) if you re-time these.
  */
 const BEATS: Beat[] = [
   {
@@ -60,37 +64,37 @@ const BEATS: Beat[] = [
     accent: magenta,
   },
   {
-    day: 7, lane: "side", side: "right", chapter: "BRANCHES", meta: "DAY 7 · BRANCHED",
+    day: 9, lane: "side", side: "right", chapter: "BRANCHES", meta: "DAY 10 · BRANCHED",
     title: "Branch for the side-quests",
     body: "A bounded detour — a course, a certification — forks off as its own line with its own tasks, and merges back when its goal is met.",
     accent: teal,
   },
   {
-    day: 14, lane: "main", side: "right", chapter: "MERGE", meta: "DAY 15 · MERGE ✦",
+    day: 18, lane: "main", side: "right", chapter: "MERGE", meta: "DAY 19 · MERGE ✦",
     title: "Merge what you finish",
     body: "The branch rejoins main as a gold milestone. The trajectory renders stronger after everything you complete.",
     accent: gold,
   },
   {
-    day: 15, lane: "drift", side: "left", chapter: "DRIFT", meta: "DAY 16 · DRIFT BEGINS",
+    day: 27, lane: "drift", side: "left", chapter: "DRIFT", meta: "DAY 28 · DRIFT BEGINS",
     title: "The signature mechanic",
     body: "A recurring distraction becomes a named branch. Name it yourself — or, after fair warning, Wyrd names it for you and main is absorbed into it.",
     accent: drift,
   },
   {
-    day: 22, lane: "main", side: "right", chapter: "THE GHOST", meta: "DAY 23 · GHOST",
+    day: 36, lane: "main", side: "right", chapter: "THE GHOST", meta: "DAY 37 · GHOST",
     title: "The ghost is the product",
     body: "Your original line runs on beside you — dashed, hollow, advancing every day. Where you would have been. The single most motivating pixel on screen.",
     accent: inkSoft,
   },
   {
-    day: 26, lane: "main", side: "left", chapter: "RECOVERY", meta: "DAY 27 · COUNTER-MERGE",
+    day: 45, lane: "main", side: "left", chapter: "RECOVERY", meta: "DAY 46 · COUNTER-MERGE",
     title: "You drifted — and recovered",
     body: "A counter-merge brings you back. The dark loop stays in history forever — proof you fell and climbed back out. History is a record, not a report card.",
     accent: magenta,
   },
   {
-    day: 33, lane: "main", side: "right", chapter: "YOUR TURN", meta: "DAY 34 · STILL HERE",
+    day: 54, lane: "main", side: "right", chapter: "YOUR TURN", meta: "DAY 55 · STILL HERE",
     title: "Written by showing up",
     body: "Months of a life, narrated from nothing but honestly committing, day after day. That autobiography starts with one line — declare yours below.",
     accent: magenta,
@@ -104,9 +108,9 @@ const smoothstep = (t: number) => t * t * (3 - 2 * t);
  * Opacity for a caption given the current frontier day. Fades in ~1.5 days
  * before the node reaches centre, holds while it scrolls up, fades out by ~7
  * days past — enough overlap that consecutive beats don't leave blank stretches,
- * but past beats don't linger as unreadable ghosts. On desktop, sides are
- * assigned so simultaneously-visible cards rarely share one; on mobile the one
- * tight pair that does (merge/drift) is de-collided by the stacking pass.
+ * but past beats don't linger as unreadable ghosts. Because the beats are spaced
+ * 9 days apart (wider than this ~8.5-day window), at most one caption is visible
+ * at a time on mobile — so the cards never have a neighbour to overlap.
  */
 function beatOpacity(frontier: number, day: number): number {
   const d = frontier - day;
@@ -117,13 +121,8 @@ function beatOpacity(frontier: number, day: number): number {
   return 0;
 }
 
-export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
+export default function WyrdStory({ trackVh = 720 }: { trackVh?: number }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  // Merge is the only card the connector meets on its BOTTOM edge, so it's the
-  // only one whose real height must be known exactly — otherwise the tail lands
-  // in empty space below a card that renders shorter than the estimate.
-  const mergeCardRef = useRef<HTMLDivElement>(null);
-  const [mergeCardH, setMergeCardH] = useState(190);
   const [frontier, setFrontier] = useState(0);
   const [storyReveal, setStoryReveal] = useState(0);
   const [vp, setVp] = useState({ w: 1200, h: 800 });
@@ -213,50 +212,28 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
   const mobileGeom = (b: Beat) => {
     const nodeX = sx(b.lane);
     const nodeY = clamp(syOf(b.day), availTop + 12, availBottom - 12);
-    // Merge is the exception. Its node sits on the central main spine, so a card
-    // parked there gets the spine running straight through it. Instead it moves
-    // to the LEFT — into the slot the branches caption has just vacated (they're
-    // never on screen together) — and sits ABOVE its node, so the spine clears
-    // the card and the connector drops from the card's BOTTOM down to the node.
-    // Every other beat parks on its open side (drift left → card right, etc.)
-    // and floats just below its node.
-    const isMerge = b.chapter === "MERGE";
-    // Merge attaches on its bottom edge, so it uses its MEASURED height; the
-    // others attach on their exact top edge, where the estimate is irrelevant.
-    const h = isMerge ? mergeCardH : CARD_H;
+    // Every beat — merge included — parks on its open side and floats just below
+    // its node. Merge is on the central main spine like the ghost/tip beats; its
+    // translucent card lets the spine read faintly through, same as theirs. (The
+    // 9-day beat spacing means only one card is ever on screen, so a card parked
+    // over the spine has no neighbour to collide with.)
+    const h = CARD_H;
     const cardBottomLimit = vp.h - h - MOBILE_EDGE;
-    const cardOnLeft = isMerge
-      ? true
-      : b.lane === "drift"
-        ? false
-        : b.lane === "side"
-          ? true
-          : b.side === "left";
+    const cardOnLeft =
+      b.lane === "drift" ? false : b.lane === "side" ? true : b.side === "left";
     const cardLeft = cardOnLeft ? MOBILE_EDGE : vp.w - MOBILE_EDGE - CARD_W;
-    const cardTop = isMerge
-      ? clamp(nodeY - MOBILE_GAP - h, availTop + MOBILE_EDGE, cardBottomLimit)
-      : clamp(nodeY + MOBILE_GAP, availTop + MOBILE_EDGE, cardBottomLimit);
+    const cardTop = clamp(nodeY + MOBILE_GAP, availTop + MOBILE_EDGE, cardBottomLimit);
     const cardBottom = cardTop + h;
-    // Where the connector meets the card. For side-parked cards it's the
-    // vertical edge facing the node (inset past the corner radius), so the
-    // S-curve sweeps in from the side. For merge it's a point on the BOTTOM
-    // edge, offset to the LEFT of the node — the card is wide enough to cover
-    // the node's column, so a straight drop would lie on the spine; offsetting
-    // left makes the tail sweep down-right into the diamond, clear of it.
-    const attachX = isMerge
-      ? clamp(nodeX - 40, cardLeft + 22, cardLeft + CARD_W - 22)
-      : cardOnLeft
-        ? cardLeft + CARD_W - 22
-        : cardLeft + 22;
-    return { nodeX, nodeY, cardLeft, cardOnLeft, cardTop, cardBottom, attachX, above: isMerge };
+    // The connector meets the card's vertical edge facing the node (inset past
+    // the corner radius), so the S-curve sweeps in from the side.
+    const attachX = cardOnLeft ? cardLeft + CARD_W - 22 : cardLeft + 22;
+    return { nodeX, nodeY, cardLeft, cardOnLeft, cardTop, cardBottom, attachX };
   };
 
-  // Every visible beat gets a card on mobile (like desktop). Placements are
-  // authored so nothing overlaps: merge floats above-left, its tight neighbour
-  // drift below-right (opposite sides), and every other consecutive pair is a
-  // full card-height or more apart. The connector attaches to whichever
-  // horizontal edge of the card faces the node — bottom when the card sits above
-  // it (merge), top when below (everyone else).
+  // Every visible beat gets a card on mobile (like desktop). Each parks on its
+  // open side and floats below its node; the connector attaches to the card's
+  // top edge (the node always sits above the card). The 9-day beat spacing keeps
+  // only one card on screen at a time, so nothing can overlap.
   const mobileCards = isNarrow
     ? BEATS.map((b) => ({ b, g: mobileGeom(b), op: beatOpacity(frontier, b.day) }))
         .filter((x) => x.op > 0.01)
@@ -267,13 +244,6 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
           return { ...x, top, attachY };
         })
     : [];
-
-  // Measure the merge card's real height whenever it appears or its width
-  // changes, so its bottom edge (and the connector that meets it) are exact.
-  const mergeShown = mobileCards.some((x) => x.b.chapter === "MERGE");
-  useEffect(() => {
-    if (mergeCardRef.current) setMergeCardH(mergeCardRef.current.offsetHeight);
-  }, [mergeShown, CARD_W, isNarrow]);
 
   return (
     <section
@@ -370,13 +340,10 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
                 const endX = g.nodeX + (g.attachX - g.nodeX) * p;
                 const endY = g.nodeY + (attachY - g.nodeY) * p;
                 const midY = (g.nodeY + endY) / 2;
-                // Side-parked cards leave the node VERTICALLY then sweep to the
-                // side (graph's fork/merge easing). Merge's card sits above and
-                // over the spine, so its tail instead leaves the node
-                // HORIZONTALLY — off the spine at once — then rises to the card.
-                const d = g.above
-                  ? `M ${g.nodeX} ${g.nodeY} C ${endX} ${g.nodeY}, ${endX} ${midY}, ${endX} ${endY}`
-                  : `M ${g.nodeX} ${g.nodeY} C ${g.nodeX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`;
+                // The card is parked to the side and below its node, so its tail
+                // leaves the node VERTICALLY then sweeps across to the card's near
+                // edge — the same fork/merge easing the graph itself uses.
+                const d = `M ${g.nodeX} ${g.nodeY} C ${g.nodeX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`;
                 return (
                   <g key={`mc${b.day}`} opacity={op}>
                     <path
@@ -405,7 +372,6 @@ export default function WyrdStory({ trackVh = 470 }: { trackVh?: number }) {
               // ~100svh container height, pushing it hundreds of px off-screen.
               <div
                 key={`mcard${b.day}`}
-                ref={b.chapter === "MERGE" ? mergeCardRef : undefined}
                 className="pointer-events-none absolute"
                 style={{
                   left: g.cardLeft,
