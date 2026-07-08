@@ -63,6 +63,33 @@ body {
   opacity: 1;
 }
 
+/* Frosted "airy capsule" form field — matches the story tooltip cards: a
+   translucent parchment lozenge with a hair-thin inset ring, no hard border.
+   The focus ring color is driven by a per-field `--ring` custom property so
+   each field can glow in its own thread accent (magenta / soft / teal). */
+.wyrd-field {
+  border-radius: 16px;
+  background: rgba(255, 251, 238, 0.6);
+  color: var(--ink);
+  box-shadow:
+    inset 0 0 0 1px rgba(58, 46, 28, 0.12),
+    0 8px 24px -18px rgba(58, 46, 28, 0.5);
+  backdrop-filter: blur(4px);
+  transition:
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+.wyrd-field:hover {
+  background: rgba(255, 251, 238, 0.72);
+}
+.wyrd-field:focus {
+  outline: none;
+  background: rgba(255, 251, 238, 0.82);
+  box-shadow:
+    inset 0 0 0 1.5px var(--ring, var(--magenta)),
+    0 10px 30px -16px rgba(58, 46, 28, 0.45);
+}
+
 /* Gentle bob for the hero's scroll-down cue. */
 @keyframes wyrd-bob {
   0%,
@@ -75,6 +102,83 @@ body {
 }
 .wyrd-bob {
   animation: wyrd-bob 1.8s ease-in-out infinite;
+}
+
+/* —— Onboarding "forge" transition ——
+   On submit the form swipes up and fades while a genesis panel rises through
+   it (crossfade), then the origin node of the new main line draws itself in —
+   the first commit — before the real graph takes over. */
+@keyframes wyrd-swipe-up {
+  to {
+    opacity: 0;
+    transform: translateY(-32px);
+    filter: blur(2px);
+  }
+}
+@keyframes wyrd-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(34px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes wyrd-node-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  62% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes wyrd-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes wyrd-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.25);
+  }
+}
+/* The form's entrance — colored branches curving in from the side and
+   straightening until they join into one taut vertical line — is scroll-
+   scrubbed and driven imperatively in Onboarding.tsx, so it needs no keyframes. */
+.wyrd-forge-exit {
+  animation: wyrd-swipe-up 0.5s cubic-bezier(0.4, 0, 0.85, 0.2) forwards;
+}
+.wyrd-genesis {
+  animation: wyrd-rise-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.wyrd-genesis-line {
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation: wyrd-draw 0.62s cubic-bezier(0.65, 0, 0.35, 1) 0.28s forwards;
+}
+.wyrd-genesis-node {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: wyrd-node-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.74s both;
+}
+.wyrd-genesis-glow {
+  transform-origin: center;
+  transform-box: fill-box;
+  opacity: 0;
+  animation: wyrd-glow-pulse 2.2s ease-in-out 0.9s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
