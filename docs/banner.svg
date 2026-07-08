@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360" font-family="Georgia, 'Times New Roman', serif">
+  <defs>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="12" cy="12" r="1" fill="#3A2E1C" opacity="0.16" />
+    </pattern>
+    <linearGradient id="needle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C2185B" />
+      <stop offset="100%" stop-color="#880E4F" />
+    </linearGradient>
+  </defs>
+
+  <!-- parchment ground -->
+  <rect width="1280" height="360" fill="#EDE0C4" />
+  <rect width="1280" height="360" fill="url(#dots)" />
+
+  <!-- logo card -->
+  <rect x="340" y="90" width="180" height="180" rx="28" fill="#F3EAD3" stroke="#DCCBA6" stroke-width="1.5" />
+
+  <!-- stitched needle-and-thread mark -->
+  <g transform="translate(340,99) scale(0.45)">
+    <path d="M 198.5 40 L 201.5 40 L 201 320 L 200 340 L 199 320 Z" fill="url(#needle)" />
+    <ellipse cx="200" cy="72" rx="2.5" ry="8" fill="#F3EAD3" stroke="#C2185B" stroke-width="1.2" />
+    <path d="M 130 40 Q 130 72 200 72" fill="none" stroke="#C2185B" stroke-width="3" stroke-dasharray="6,4" stroke-linecap="round" />
+    <path d="M 200 72 C 300 72 300 135 250 135" fill="none" stroke="#1B4332" stroke-width="3" stroke-linecap="round" />
+    <path d="M 250 135 C 200 135 200 135 200 135" fill="none" stroke="#B8860B" stroke-width="3" stroke-linecap="round" />
+    <path d="M 200 135 C 100 135 100 198 150 198" fill="none" stroke="#1B4332" stroke-width="3" stroke-linecap="round" />
+    <path d="M 150 198 C 200 198 200 198 200 198" fill="none" stroke="#B8860B" stroke-width="3" stroke-linecap="round" />
+    <path d="M 200 198 Q 270 198 270 280" fill="none" stroke="#C2185B" stroke-width="3" stroke-dasharray="6,4" stroke-linecap="round" />
+  </g>
+
+  <!-- strapline -->
+  <text x="562" y="126" font-size="19" letter-spacing="5" fill="#6B5A3D">A VERSION CONTROL FOR YOUR LIFE</text>
+
+  <!-- wordmark -->
+  <text x="558" y="222" font-size="130" font-weight="700" letter-spacing="8" fill="#3A2E1C">WYRD</text>
+
+  <!-- tagline -->
+  <text x="562" y="268" font-size="30" font-style="italic" fill="#6B5A3D">weave your wyrd</text>
+</svg>
