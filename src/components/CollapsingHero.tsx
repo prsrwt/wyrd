@@ -24,9 +24,16 @@
  * scroll container that would break the sticky pin.
  */
 
-import { useRef, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 import { useScroll, animated } from "@react-spring/web";
 import WyrdLogo from "@/components/WyrdLogo";
+
+function subscribeViewport(onResize: () => void) {
+  window.addEventListener("resize", onResize);
+  return () => window.removeEventListener("resize", onResize);
+}
+const getViewportHeight = () => window.innerHeight;
+const getServerViewportHeight = () => 800;
 
 interface CollapsingHeroProps {
   eyebrow: string;
@@ -48,27 +55,18 @@ export default function CollapsingHero({
   maxWidth = "520px",
   trackVh = 170,
 }: CollapsingHeroProps) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  // How many px of scroll the pin spans (track height minus one viewport).
-  // Kept in a ref so the interpolation closures always read the live value
-  // without re-creating springs.
-  const pinPx = useRef(1);
-
-  useEffect(() => {
-    const measure = () => {
-      const h = trackRef.current?.offsetHeight ?? 0;
-      pinPx.current = Math.max(1, h - window.innerHeight);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [trackVh]);
+  // The track is `trackVh` vh tall and the sticky stage is one viewport, so the
+  // pin spans (trackVh - 100) viewport-heights of scroll. Deriving pinPx from
+  // the live viewport height (via useSyncExternalStore) avoids measuring the DOM
+  // and avoids reading a ref during render — both lint-clean and resize-aware.
+  const viewportH = useSyncExternalStore(subscribeViewport, getViewportHeight, getServerViewportHeight);
+  const pinPx = Math.max(1, (viewportH * (trackVh - 100)) / 100);
 
   // A gentle spring on the scroll value gives the parallax its trailing, weighty
   // feel on top of Lenis, without lagging so far it feels disconnected.
   const { scrollY } = useScroll({ config: { tension: 320, friction: 44 } });
 
-  const progress = (y: number) => Math.min(1, Math.max(0, y / pinPx.current));
+  const progress = (y: number) => Math.min(1, Math.max(0, y / pinPx));
 
   // Layer 1 — logo + wordmark: shrink and rise into the header, fade last.
   const logoTransform = scrollY.to((y) => {
@@ -100,7 +98,7 @@ export default function CollapsingHero({
 
   return (
     <>
-      <div ref={trackRef} className="relative" style={{ height: `${trackVh}vh` }}>
+      <div className="relative" style={{ height: `${trackVh}vh` }}>
         <div className="sticky top-0 z-[2] flex h-[100svh] flex-col items-center justify-center overflow-hidden px-5">
           {/* Layer 0 — background glow */}
           <animated.div

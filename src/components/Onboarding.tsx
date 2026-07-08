@@ -20,7 +20,7 @@
  * real graph.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLenis } from "lenis/react";
 import { useWyrdStore } from "@/lib/store/useWyrdStore";
 import CollapsingHero from "@/components/CollapsingHero";
@@ -141,6 +141,16 @@ export default function Onboarding() {
   const segRefs = useRef<(SVGPathElement | null)[]>([]);
   const nodeRefs = useRef<(SVGGElement | null)[]>([]);
   const fieldRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Registration callbacks so <Row> writes into these arrays through a function
+  // the parent owns, instead of mutating a ref passed down as a prop (which the
+  // react-hooks lint rule — rightly — flags as mutating another component's value).
+  const registerRow = useCallback((index: number, el: HTMLDivElement | null) => {
+    rowRefs.current[index] = el;
+  }, []);
+  const registerField = useCallback((index: number, el: HTMLDivElement | null) => {
+    fieldRefs.current[index] = el;
+  }, []);
   const fallRef = useRef<SVGPathElement | null>(null);
   const fallTipRef = useRef<SVGCircleElement | null>(null);
   const fallLenRef = useRef<number | null>(null);
@@ -473,7 +483,7 @@ export default function Onboarding() {
               </svg>
             )}
 
-            <Row rowRefs={rowRefs} fieldRefs={fieldRefs} index={0}>
+            <Row registerRow={registerRow} registerField={registerField} index={0}>
               <label className="block">
                 <FieldLabel accent="var(--magenta)">Trajectory</FieldLabel>
                 <input
@@ -486,7 +496,7 @@ export default function Onboarding() {
               </label>
             </Row>
 
-            <Row rowRefs={rowRefs} fieldRefs={fieldRefs} index={1}>
+            <Row registerRow={registerRow} registerField={registerField} index={1}>
               <label className="block">
                 <FieldLabel accent="var(--ink-soft)">
                   Why <span className="font-normal opacity-70">(optional)</span>
@@ -501,7 +511,7 @@ export default function Onboarding() {
               </label>
             </Row>
 
-            <Row rowRefs={rowRefs} fieldRefs={fieldRefs} index={2}>
+            <Row registerRow={registerRow} registerField={registerField} index={2}>
               <FieldLabel accent="var(--teal)">Daily tasks</FieldLabel>
               <div className="flex flex-col gap-2">
                 {taskLabels.map((label, i) => (
@@ -535,7 +545,7 @@ export default function Onboarding() {
               </button>
             </Row>
 
-            <Row rowRefs={rowRefs} fieldRefs={fieldRefs} index={3} last>
+            <Row registerRow={registerRow} registerField={registerField} index={3} last>
               <button
                 type="button"
                 onClick={submit}
@@ -569,14 +579,14 @@ export default function Onboarding() {
 /** A threaded field: reserves the left gutter for the line art and exposes its
  *  content wrapper to the scroll driver (which fades + slides it in). */
 function Row({
-  rowRefs,
-  fieldRefs,
+  registerRow,
+  registerField,
   index,
   last = false,
   children,
 }: {
-  rowRefs: React.RefObject<(HTMLDivElement | null)[]>;
-  fieldRefs: React.RefObject<(HTMLDivElement | null)[]>;
+  registerRow: (index: number, el: HTMLDivElement | null) => void;
+  registerField: (index: number, el: HTMLDivElement | null) => void;
   index: number;
   last?: boolean;
   children: React.ReactNode;
@@ -584,13 +594,13 @@ function Row({
   return (
     <div
       ref={(el) => {
-        rowRefs.current[index] = el;
+        registerRow(index, el);
       }}
       className={last ? "pb-1 pl-12" : "pb-6 pl-12"}
     >
       <div
         ref={(el) => {
-          fieldRefs.current[index] = el;
+          registerField(index, el);
         }}
         style={{ opacity: 0 }}
       >
