@@ -12,18 +12,26 @@
  */
 
 import { ReactLenis } from "lenis/react";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onChange: () => void) {
+  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+const getReducedMotion = () => window.matchMedia(REDUCED_MOTION_QUERY).matches;
+const getServerReducedMotion = () => false;
 
 export default function SmoothScroll({ children }: { children: React.ReactNode }) {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
+  // useSyncExternalStore is the lint-clean, SSR-safe way to read a browser-only
+  // value (the media query) without a setState-in-effect.
+  const reduced = useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotion,
+    getServerReducedMotion,
+  );
 
   return (
     <ReactLenis
